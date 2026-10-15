@@ -1,0 +1,28 @@
+/* Ported verbatim from reference/Cogni.ai-v7.html <style> — base / reset */
+*{box-sizing:border-box}
+html{scroll-padding-top:calc(var(--topbar-h) + 12px)}
+html,body{background:var(--color-background);overflow-x:hidden}
+body{margin:0;color:var(--color-foreground);font-family:var(--font);font-size:16px;line-height:1.55;-webkit-font-smoothing:antialiased;padding-bottom:env(safe-area-inset-bottom,0px);max-width:100vw}
+[hidden]{display:none!important}
+img{max-width:100%}
+h1,h2,h3,h4{font-family:var(--font-display);margin:0;text-wrap:balance;letter-spacing:-.012em;line-height:1.2}
+p{text-wrap:pretty}
+button{font:inherit;cursor:pointer;color:inherit}
+button:disabled{cursor:not-allowed}
+input,textarea,select{font:inherit;color:var(--color-foreground)}
+a{color:var(--color-ring);text-underline-offset:3px}
+a:hover{color:var(--color-foreground)}
+:focus-visible{outline:3px solid var(--color-primary);outline-offset:2px;border-radius:4px}
+::selection{background:color-mix(in srgb,var(--color-primary) 45%,transparent)}
+.sr-only{position:absolute!important;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.skip{position:absolute;left:12px;top:-60px;z-index:200;background:var(--color-primary);color:var(--color-on-primary);padding:10px 14px;border-radius:var(--radius-sm);font-weight:600;transition:top var(--t) var(--ease-out)}
+.skip:focus{top:12px;color:var(--color-on-primary)}
+.i{width:18px;height:18px;flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
+.i.sm{width:15px;height:15px}
+.mono{font-family:var(--font-mono);font-size:12.5px}
+.num{font-variant-numeric:tabular-nums}
+.small{font-size:13.5px;color:var(--color-muted-foreground);line-height:1.5}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.sp{flex:1}
+.mt{margin-top:20px}
+

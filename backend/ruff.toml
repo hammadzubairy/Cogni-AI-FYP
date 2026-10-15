@@ -1,0 +1,6 @@
+[lint]
+# EXE002 is ignored: this filesystem mounts every file as executable
+# regardless of chmod, so the check is a permanent false positive here.
+# B008 is ignored: FastAPI's `Depends(...)` in a parameter default is the
+# documented, idiomatic way to wire dependency injection, not a bug.
+ignore = ["EXE002", "B008"]

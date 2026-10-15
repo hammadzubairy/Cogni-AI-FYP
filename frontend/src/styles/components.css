@@ -1,0 +1,37 @@
+/* Ported verbatim from reference/Cogni.ai-v7.html — Buttons + Logo.
+   Panel, pill, table, modal, toast, question, exam, chat, etc. follow the
+   APP SHELL section in v7 and live in app.css to preserve cascade order. */
+/* ---------- Buttons ---------- */
+.btn{position:relative;display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;border:1px solid var(--color-border);background:var(--color-card);color:var(--color-foreground);padding:9px 16px;border-radius:var(--radius-sm);font-weight:600;font-size:14.5px;line-height:1.2;text-decoration:none;white-space:nowrap;box-shadow:var(--shadow-sm);
+  transition:background var(--t-fast) ease,border-color var(--t-fast) ease,color var(--t-fast) ease,box-shadow var(--t-fast) ease,transform var(--t-fast) var(--ease-out)}
+.btn:hover:not(:disabled){border-color:var(--color-muted-foreground);color:var(--color-foreground)}
+.btn:active:not(:disabled){transform:translateY(1px) scale(.985)}
+.btn:disabled{opacity:.55;box-shadow:none}
+.btn.primary{background:var(--color-primary);border-color:var(--color-primary);color:var(--color-on-primary)}
+.btn.primary:hover:not(:disabled){background:var(--color-ring);border-color:var(--color-ring);color:var(--color-on-primary)}
+.btn.good{background:var(--color-success-strong);border-color:var(--color-success-strong);color:#fff}
+.btn.good:hover:not(:disabled){background:var(--color-success-strong);border-color:var(--color-success-strong);color:#fff}
+.btn.bad{color:var(--color-destructive);border-color:color-mix(in srgb,var(--color-destructive) 35%,transparent);background:var(--color-card)}
+.btn.bad:hover:not(:disabled){background:var(--color-destructive-muted);border-color:var(--color-destructive);color:var(--color-destructive)}
+.btn.bad.solid{background:var(--color-destructive-strong);border-color:var(--color-destructive-strong);color:#fff}
+.btn.bad.solid:hover:not(:disabled){background:var(--color-destructive-strong);color:#fff}
+.btn.small{min-height:36px;padding:6px 12px;font-size:13.5px}
+.btn.ghost{border-color:transparent;background:transparent;box-shadow:none}
+.btn.ghost:hover:not(:disabled){background:var(--color-muted);border-color:transparent}
+.btn.icon{padding:0;width:42px}
+.btn.small.icon{width:36px}
+.btn.busy{color:transparent!important;pointer-events:none}
+.btn.busy::after{content:"";position:absolute;width:18px;height:18px;border-radius:50%;border:2.5px solid rgba(255,255,255,.45);border-top-color:#fff;animation:spin .7s linear infinite}
+.btn:not(.primary):not(.good).busy::after{border-color:var(--color-border);border-top-color:var(--color-primary)}
+.vsep{width:1px;align-self:stretch;background:var(--color-border);margin:4px 4px}
+
+/* ---------- Logo ---------- */
+.logo{font-family:var(--font-display);font-weight:800;font-size:20px;display:inline-flex;align-items:center;gap:10px;color:var(--color-foreground);text-decoration:none;letter-spacing:-.025em;line-height:1}
+.logo svg{width:32px;height:32px;flex-shrink:0}
+.logo .ai{color:var(--color-ring)}
+.logo .lm-bg{fill:var(--color-primary)}.logo .lm-c{stroke:#fff}.logo .lm-t{stroke:var(--color-accent)}.logo .lm-d{fill:var(--color-accent)}
+.logo.inv{color:#fff}.logo.inv .ai{color:var(--color-accent)}.logo.inv .lm-bg{fill:#fff}.logo.inv .lm-c{stroke:var(--color-primary)}.logo.inv .lm-t{stroke:var(--color-primary)}.logo.inv .lm-d{fill:var(--color-primary)}
+.logo:hover .lm-t{animation:tick .5s var(--ease-out)}
+@keyframes tick{0%{stroke-dashoffset:14}100%{stroke-dashoffset:0}}
+.lm-t{stroke-dasharray:14}
+
