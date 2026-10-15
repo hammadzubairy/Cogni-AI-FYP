@@ -45,7 +45,11 @@ export default defineConfig({
         APP_ENV: 'test',
         JWT_SECRET: process.env.JWT_SECRET || 'playwright-test-jwt-secret-32chars!!',
         MONGO_DB,
+        // Prefer caller/env (.env) so real Groq/OpenAI can be used; default mock.
         LLM_PROVIDER,
+        LLM_MODEL: process.env.LLM_MODEL || '',
+        LLM_API_KEY: process.env.LLM_API_KEY || '',
+        LLM_BASE_URL: process.env.LLM_BASE_URL || '',
         // Portal smokes + full-loop each call /auth/login; production cap is 10/min.
         LOGIN_RATE_LIMIT_MAX: '10000',
         LLM_RATE_LIMIT_MAX: '10000',

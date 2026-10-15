@@ -85,9 +85,14 @@ class OpenAIClient(LLMClient):
                 timeout=60,
             )
         except TimeoutError as exc:
-            raise LLMRequestError("The OpenAI request timed out.") from exc
+            raise LLMRequestError("The LLM request timed out.") from exc
         except Exception as exc:
-            raise LLMRequestError("The OpenAI request failed.") from exc
+            detail = str(exc).strip() or "The LLM request failed."
+            # Keep message short for the API client; full error stays in logs.
+            if len(detail) > 240:
+                detail = detail[:240] + "…"
+            log_event(logger, "llm_provider_error", provider="openai", error=detail)
+            raise LLMRequestError(detail) from exc
         content = response.choices[0].message.content or ""
         usage = getattr(response, "usage", None)
         if usage is not None:
@@ -372,10 +377,12 @@ async def call_json(
 
 
 def get_llm_client() -> LLMClient:
-    if settings.LLM_PROVIDER == "mock":
+    provider = (settings.LLM_PROVIDER or "").strip().lower()
+    if provider == "mock":
         return MockLLM()
-    if settings.LLM_PROVIDER == "openai":
+    # Groq is OpenAI-compatible — set LLM_BASE_URL=https://api.groq.com/openai/v1
+    if provider in ("openai", "groq"):
         return OpenAIClient()
-    if settings.LLM_PROVIDER == "anthropic":
+    if provider == "anthropic":
         return AnthropicClient()
     raise NotImplementedError(f"LLM_PROVIDER={settings.LLM_PROVIDER!r} is not implemented.")

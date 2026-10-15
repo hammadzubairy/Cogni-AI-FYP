@@ -294,7 +294,7 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
                 <span>
                   {file
                     ? 'Ready. Press Process material, or choose a different file.'
-                    : 'Text-based PDFs only. Scanned pages with no selectable text are rejected. Size limits come from the server.'}
+                    : 'Text-based PDFs only (selectable text). There is no OCR yet — scanned image PDFs and PowerPoint (.ppt/.pptx) are not supported. Use Paste notes for typed text.'}
                 </span>
               </label>
               <input

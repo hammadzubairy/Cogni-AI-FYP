@@ -2,6 +2,9 @@
 
 export const TOKEN_KEY = 'cogni-token'
 
+/** Optional absolute API origin for production (e.g. https://cogni-api.vercel.app). */
+const API_BASE = String(import.meta.env.VITE_API_BASE || '').replace(/\/$/, '')
+
 export class ApiError extends Error {
   constructor(status, code, message) {
     super(message)
@@ -64,9 +67,10 @@ function parseDetail(body) {
  */
 export async function request(path, options = {}) {
   const { json, formData, skipAuth, headers: extraHeaders, ...rest } = options
-  const url = path.startsWith('/api')
+  const apiPath = path.startsWith('/api')
     ? path
     : `/api${path.startsWith('/') ? path : `/${path}`}`
+  const url = API_BASE ? `${API_BASE}${apiPath}` : apiPath
 
   const headers = new Headers(extraHeaders || {})
   if (json !== undefined) {

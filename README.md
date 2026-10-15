@@ -83,6 +83,60 @@ cd frontend && CI=1 npm run test:e2e   # Playwright; needs Mongo + Chromium
 - SMTP for password-reset email (otherwise admin reset is the fallback)
 - Rotate `JWT_SECRET` if it was ever committed or shared
 
+## Deploy on Vercel (frontend + backend)
+
+Use **two Vercel projects** from the same GitHub repo (recommended).
+
+### A. MongoDB Atlas (required)
+
+1. Create a free cluster at [mongodb.com/atlas](https://www.mongodb.com/atlas).
+2. Network Access → allow `0.0.0.0/0` (or Vercel IPs).
+3. Database Access → create a user.
+4. Connect → copy the `mongodb+srv://…` URI.
+
+### B. Backend project
+
+1. [vercel.com/new](https://vercel.com/new) → import this repo.
+2. **Root Directory:** `backend`
+3. Framework: FastAPI (auto-detected via `main.py` / `pyproject.toml`).
+4. Environment variables:
+
+| Name | Value |
+|---|---|
+| `APP_ENV` | `production` |
+| `MONGO_URI` | Atlas URI |
+| `MONGO_DB` | `cogni` (not `*_dev` / `*_test`) |
+| `JWT_SECRET` | ≥32 random chars |
+| `LLM_PROVIDER` | `openai` |
+| `LLM_BASE_URL` | `https://api.groq.com/openai/v1` |
+| `LLM_MODEL` | `qwen/qwen3.8-27b` |
+| `LLM_API_KEY` | your Groq key |
+| `CORS_ORIGINS` | frontend URL (set after step C) |
+| `PUBLIC_BASE_URL` | frontend URL |
+
+5. Deploy → open `https://<backend>.vercel.app/api/health` → `{"status":"ok"}`.
+
+`backend/vercel.json` sets `maxDuration` to 60s for exam generation.
+
+### C. Frontend project
+
+1. Another Vercel project → same repo.
+2. **Root Directory:** `frontend`
+3. Build: `npm run build` · Output: `dist`
+4. Env: `VITE_API_BASE=https://<backend>.vercel.app` (no trailing slash).
+5. Deploy → copy the frontend URL.
+6. Go back to the **backend** project → set `CORS_ORIGINS` and `PUBLIC_BASE_URL` to that frontend URL → Redeploy backend.
+
+### D. First admin
+
+Open the frontend → `/setup` → create the first admin.
+
+### Limits to know
+
+- Vercel Hobby function timeout is shorter; Pro allows up to 60–300s depending on plan.
+- Large PDF uploads may hit body-size limits; keep under ~4.5 MB on Hobby or raise limits on Pro.
+- Cold starts can add a few seconds on the first request after idle.
+
 ## Purge leftover demo users
 
 ```bash

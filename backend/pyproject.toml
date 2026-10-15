@@ -1,0 +1,22 @@
+[project]
+name = "cogni-ai-backend"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi",
+  "uvicorn[standard]",
+  "pydantic",
+  "pydantic-settings",
+  "pymongo>=4.9",
+  "pyjwt",
+  "bcrypt",
+  "pypdf",
+  "python-multipart",
+  "httpx",
+  "openai",
+  "anthropic",
+  "python-dotenv",
+]
+
+[tool.vercel]
+entrypoint = "main:app"
