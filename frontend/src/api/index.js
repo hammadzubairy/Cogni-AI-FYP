@@ -41,6 +41,14 @@ export function register(body) {
   return post('/auth/register', body, { skipAuth: true })
 }
 
+export function verifyEmail(token) {
+  return post('/auth/verify-email', { token }, { skipAuth: true })
+}
+
+export function resendVerification(email) {
+  return post('/auth/resend-verification', { email }, { skipAuth: true })
+}
+
 export function forgotPassword(email) {
   return post('/auth/forgot', { email }, { skipAuth: true })
 }

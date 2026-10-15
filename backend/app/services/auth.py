@@ -18,6 +18,7 @@ from app.services.passwords import generate_temporary_password, hash_reset_token
 
 GENERIC_LOGIN_ERROR = "Incorrect email or password."
 INACTIVE_ERROR = "This account is deactivated. Ask an admin to reactivate it."
+UNVERIFIED_ERROR = "Verify your email before signing in. Check your inbox for a link."
 LOCKED_ERROR = "Too many failed sign-in attempts. Try again later."
 
 
@@ -67,7 +68,10 @@ async def authenticate(email: str, password: str) -> dict:
             actor_override={"id": str(user["_id"]), "name": user["name"], "role": user["role"]},
         )
         raise AuthError(401, GENERIC_LOGIN_ERROR)
-    if user["status"] != "active":
+    status = user.get("status", "active")
+    if status == "pending_verification":
+        raise AuthError(403, UNVERIFIED_ERROR)
+    if status != "active":
         raise AuthError(403, INACTIVE_ERROR)
 
     await db.users.update_one(
@@ -143,22 +147,44 @@ async def change_password(user_id: str, current_password: str, new_password: str
     return user
 
 
+async def _issue_email_verification(user: dict) -> str:
+    """Create a verification token, store hash, send mail. Returns raw token."""
+    db = get_db()
+    raw = secrets.token_urlsafe(32)
+    token_hash = hash_reset_token(raw)
+    expires = datetime.now(UTC) + timedelta(minutes=settings.EMAIL_VERIFY_MINUTES)
+    await db.email_verifications.delete_many({"user_id": str(user["_id"])})
+    await db.email_verifications.insert_one(
+        {
+            "token_hash": token_hash,
+            "user_id": str(user["_id"]),
+            "expires_at": expires,
+            "used": False,
+        }
+    )
+    link = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/verify/{raw}"
+    body = (
+        f"Verify your Cogni.ai email using this link (expires in "
+        f"{settings.EMAIL_VERIFY_MINUTES} minutes):\n\n{link}\n"
+    )
+    # Always send via mailer (ConsoleMailer in test/dev when SMTP unset).
+    get_mailer().send(user["email"], "Verify your Cogni.ai email", body)
+    return raw
+
+
 async def register_user(
-    name: str,
-    email: str,
-    password: str,
-    role: str = "student",
-    dept_id: str | None = None,
+    name: str, email: str, password: str, *, role: str = "student"
 ) -> dict:
-    """Public self-signup for any role when signup is enabled in settings."""
+    """Public student self-signup. Creates pending_verification user and emails a link."""
     db = get_db()
     s = await settings_service.get_settings()
     if not s.get("student_signup_enabled", True):
         raise HTTPException(status_code=403, detail="Self-signup is disabled.")
-
-    allowed_roles = {"admin", "hod", "teacher", "student"}
-    if role not in allowed_roles:
-        raise HTTPException(status_code=400, detail="Choose a valid role.")
+    if (role or "student").strip().lower() != "student":
+        raise HTTPException(
+            status_code=400,
+            detail="Public signup is for students only. Ask an admin to add staff accounts.",
+        )
 
     email_n = email.strip().lower()
     domains = s.get("allowed_email_domains") or []
@@ -172,33 +198,13 @@ async def register_user(
     if await db.users.find_one({"email": email_n}):
         raise HTTPException(status_code=409, detail="Could not create that account.")
 
-    resolved_dept: str | None = None
-    if role == "admin":
-        resolved_dept = None
-    elif role == "student":
-        resolved_dept = None
-    else:
-        if not dept_id:
-            raise HTTPException(status_code=400, detail="Choose a department.")
-        dept = await db.departments.find_one({"_id": oid(dept_id)})
-        if dept is None:
-            raise HTTPException(status_code=400, detail="Department not found.")
-        if role == "hod" and dept.get("hod_id"):
-            raise HTTPException(
-                status_code=400,
-                detail="This department already has a head. Sign up as a teacher instead.",
-            )
-        resolved_dept = str(dept["_id"])
-
-    from datetime import UTC, datetime
-
     doc = {
         "name": name.strip(),
         "email": email_n,
         "password_hash": hash_password(password),
-        "role": role,
-        "dept_id": resolved_dept,
-        "status": "active",
+        "role": "student",
+        "dept_id": None,
+        "status": "pending_verification",
         "must_change_password": False,
         "token_version": 0,
         "created_at": datetime.now(UTC),
@@ -207,19 +213,54 @@ async def register_user(
     }
     result = await db.users.insert_one(doc)
     doc["_id"] = result.inserted_id
-    user_id = str(result.inserted_id)
-
-    if role == "hod" and resolved_dept:
-        await db.departments.update_one(
-            {"_id": oid(resolved_dept)}, {"$set": {"hod_id": user_id}}
-        )
-
+    await _issue_email_verification(doc)
     return doc
 
 
 async def register_student(name: str, email: str, password: str) -> dict:
     """Back-compat wrapper — student self-signup."""
-    return await register_user(name, email, password, role="student")
+    return await register_user(name, email, password)
+
+
+async def verify_email(token: str) -> dict:
+    db = get_db()
+    token_hash = hash_reset_token(token)
+    row = await db.email_verifications.find_one({"token_hash": token_hash})
+    if row is None or row.get("used"):
+        raise HTTPException(status_code=400, detail="This verification link is invalid or expired.")
+    exp = row["expires_at"]
+    if exp.tzinfo is None:
+        exp = exp.replace(tzinfo=UTC)
+    if exp < datetime.now(UTC):
+        raise HTTPException(status_code=400, detail="This verification link is invalid or expired.")
+    user = await db.users.find_one({"_id": oid(row["user_id"])})
+    if user is None:
+        raise HTTPException(status_code=400, detail="This verification link is invalid or expired.")
+    if user.get("status") == "active":
+        await db.email_verifications.update_one({"_id": row["_id"]}, {"$set": {"used": True}})
+        return user
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$set": {"status": "active"}},
+    )
+    await db.email_verifications.update_one({"_id": row["_id"]}, {"$set": {"used": True}})
+    user = await db.users.find_one({"_id": user["_id"]})
+    await log_activity(
+        None,
+        f"Email verified for {user['email']}",
+        actor_override={"id": str(user["_id"]), "name": user["name"], "role": user["role"]},
+    )
+    return user
+
+
+async def resend_verification(email: str) -> None:
+    """Always succeeds from the caller's perspective (no email enumeration)."""
+    db = get_db()
+    email_n = email.strip().lower()
+    user = await db.users.find_one({"email": email_n, "status": "pending_verification"})
+    if not user:
+        return
+    await _issue_email_verification(user)
 
 
 async def forgot_password(email: str) -> None:
@@ -297,6 +338,8 @@ __all__ = [
     "change_password",
     "register_user",
     "register_student",
+    "verify_email",
+    "resend_verification",
     "forgot_password",
     "reset_password_with_token",
     "generate_temporary_password",

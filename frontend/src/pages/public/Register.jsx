@@ -1,54 +1,26 @@
 import { useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate } from 'react-router-dom'
+import { Link, Navigate } from 'react-router-dom'
 import { ApiError } from '../../api/client'
 import * as api from '../../api'
 import { ROLE_HOME, useAuth } from '../../auth/AuthContext'
 import { Icon } from '../../components/IconSprite'
 import AuthShell from './AuthShell'
 
-const ROLES = [
-  { value: 'student', label: 'Student' },
-  { value: 'teacher', label: 'Teacher' },
-  { value: 'hod', label: 'HOD' },
-  { value: 'admin', label: 'Admin' },
-]
-
 export default function Register() {
-  const { user, loading, configLoading, publicConfig, register, mustChangePassword } =
-    useAuth()
-  const navigate = useNavigate()
+  const { user, loading, configLoading, publicConfig, mustChangePassword } = useAuth()
 
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState('student')
-  const [deptId, setDeptId] = useState('')
-  const [departments, setDepartments] = useState([])
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
-
-  const needsDept = role === 'teacher' || role === 'hod'
+  const [pendingEmail, setPendingEmail] = useState('')
+  const [resendBusy, setResendBusy] = useState(false)
+  const [resendNotice, setResendNotice] = useState('')
 
   useEffect(() => {
     document.title = 'Create account · Cogni.ai'
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    api
-      .publicDepartments()
-      .then((list) => {
-        if (!cancelled) {
-          setDepartments(Array.isArray(list) ? list : [])
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setDepartments([])
-      })
-    return () => {
-      cancelled = true
-    }
   }, [])
 
   if (!loading && !configLoading && publicConfig && !publicConfig.student_signup_enabled) {
@@ -61,78 +33,78 @@ export default function Register() {
 
   async function onSubmit() {
     setError('')
-    if (needsDept && !deptId) {
-      setError('Choose a department.')
-      return
-    }
     setBusy(true)
     try {
-      const body = {
+      const res = await api.register({
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password,
-        role,
-      }
-      if (needsDept) body.dept_id = deptId
-      const u = await register(body)
-      navigate(
-        u.must_change_password ? '/change-password' : ROLE_HOME[u.role] || '/app/student',
-        { replace: true },
-      )
+      })
+      setPendingEmail(res.email || email.trim().toLowerCase())
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not create account.')
       setBusy(false)
     }
   }
 
+  async function onResend() {
+    if (!pendingEmail || resendBusy) return
+    setResendBusy(true)
+    setResendNotice('')
+    try {
+      await api.resendVerification(pendingEmail)
+      setResendNotice('If that account needs verification, we sent another email.')
+    } catch {
+      setResendNotice('Could not resend right now. Try again shortly.')
+    } finally {
+      setResendBusy(false)
+    }
+  }
+
+  if (pendingEmail) {
+    return (
+      <AuthShell
+        title="Check your email"
+        subtitle="We sent a verification link. Open it to activate your student account, then sign in."
+        sideBody="Staff accounts (teacher, HOD, admin) are created by an institution admin — not through this form."
+      >
+        <div className="callout blue" role="status">
+          <Icon name="info" />
+          <div>
+            Verification email sent to <b>{pendingEmail}</b>. The link expires in about an hour.
+          </div>
+        </div>
+        {resendNotice ? (
+          <p className="small" style={{ marginTop: 14 }}>
+            {resendNotice}
+          </p>
+        ) : null}
+        <button
+          type="button"
+          className="btn"
+          style={{ width: '100%', minHeight: 48, marginTop: 16 }}
+          onClick={onResend}
+          disabled={resendBusy}
+        >
+          {resendBusy ? 'Sending…' : 'Resend verification email'}
+        </button>
+        <p className="small" style={{ margin: '14px 0 0', textAlign: 'center' }}>
+          Ready? <Link to="/login">Sign in</Link>
+        </p>
+      </AuthShell>
+    )
+  }
+
   return (
     <AuthShell
-      title="Create account"
-      subtitle="Pick your role, then sign up with your school email. Teachers and heads need a department."
-      sideBody="Students, teachers, heads and admins can create an account when signup is enabled. Join a class with a code from your teacher after signing up as a student."
+      title="Create student account"
+      subtitle="Sign up with your school email. After you verify the message we send, you can sign in and join a class with a code from your teacher."
+      sideBody="Public signup is for students only. Teachers, heads and admins are added by an institution admin."
     >
       {error ? (
         <div className="err" role="alert">
           <Icon name="alert" />
           <span>{error}</span>
-        </div>
-      ) : null}
-      <div className="field">
-        <label htmlFor="r-role">I am a…</label>
-        <select
-          id="r-role"
-          value={role}
-          onChange={(e) => {
-            setRole(e.target.value)
-            setDeptId('')
-          }}
-          disabled={busy}
-        >
-          {ROLES.map((r) => (
-            <option key={r.value} value={r.value}>
-              {r.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      {needsDept ? (
-        <div className="field">
-          <label htmlFor="r-dept">Department</label>
-          <select
-            id="r-dept"
-            value={deptId}
-            onChange={(e) => setDeptId(e.target.value)}
-            disabled={busy || departments.length === 0}
-          >
-            <option value="">
-              {departments.length ? 'Select department…' : 'No departments yet — ask an admin'}
-            </option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.code} — {d.name}
-              </option>
-            ))}
-          </select>
         </div>
       ) : null}
       <div className="field">

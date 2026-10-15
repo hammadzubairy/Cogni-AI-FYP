@@ -28,7 +28,7 @@ Implements the mission in the Phase-2 prompt. Decisions that deviate from the pr
 - User fields: must_change_password, token_version, created_at, last_login_at, created_by.
 - Admin create/reset → random 14-char temp password once in response; must_change_password=true.
 - Scoped JWT `scope=change_password` until change succeeds.
-- Register (student only), forgot/reset with hashed token + ConsoleMailer/SmtpMailer.
+- Register (student only) → `pending_verification` + email verify link; forgot/reset with hashed token + ConsoleMailer/SmtpMailer. Staff via admin Add Staff only.
 - Login: dummy bcrypt for unknown emails; per-email lockout in Mongo; bump token_version on password events.
 - Remove `/api/auth/demo-accounts`.
 - `python -m app.cli migrate` idempotent.

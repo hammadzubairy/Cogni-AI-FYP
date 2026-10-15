@@ -37,8 +37,14 @@ class RegisterRequest(BaseModel):
     name: str
     email: str
     password: str
+    # Accepted only as "student" for backwards-compatible clients; staff roles are rejected.
     role: Role = "student"
-    dept_id: str | None = None
+
+
+class RegisterPendingOut(BaseModel):
+    status: str = "pending_verification"
+    message: str = "Check your email to verify your account before signing in."
+    email: str
 
 
 class PublicDepartmentOut(BaseModel):
@@ -48,6 +54,14 @@ class PublicDepartmentOut(BaseModel):
 
 
 class ForgotRequest(BaseModel):
+    email: str
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+
+
+class ResendVerificationRequest(BaseModel):
     email: str
 
 

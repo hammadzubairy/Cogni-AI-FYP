@@ -12,17 +12,16 @@ test.describe('Public pages', () => {
   test('login page shows create-account link', async ({ page }) => {
     await page.goto('/login')
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
-    await expect(page.getByRole('link', { name: /Create account/i })).toBeVisible()
+    await expect(page.getByRole('link', { name: /Create (student )?account/i })).toBeVisible()
   })
 
-  test('register page offers all roles', async ({ page }) => {
+  test('register page is student-only', async ({ page }) => {
     await page.goto('/register')
-    await expect(page.getByRole('heading', { name: 'Create account' })).toBeVisible()
-    const role = page.locator('#r-role')
-    await expect(role).toBeVisible()
-    await expect(role.locator('option')).toHaveCount(4)
-    await role.selectOption('teacher')
-    await expect(page.locator('#r-dept')).toBeVisible()
+    await expect(page.getByRole('heading', { name: /Create student account/i })).toBeVisible()
+    await expect(page.locator('#r-role')).toHaveCount(0)
+    await expect(page.locator('#r-dept')).toHaveCount(0)
+    await expect(page.locator('#r-name')).toBeVisible()
+    await expect(page.locator('#r-email')).toBeVisible()
   })
 
   test('teacher sign-in lands on teacher home', async ({ page }) => {

@@ -139,8 +139,8 @@ export function AuthProvider({ children }) {
   }, [refreshPublicConfig])
 
   const register = useCallback(async (body) => {
-    const res = await api.register(body)
-    return applyAuthResult(res, setUser, setScope)
+    // Public register returns pending_verification (no JWT).
+    return api.register(body)
   }, [])
 
   /** @deprecated use register */

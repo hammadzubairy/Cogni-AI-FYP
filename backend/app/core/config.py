@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     SMTP_STARTTLS: bool = True
     PUBLIC_BASE_URL: str = "http://localhost:5173"
     PASSWORD_RESET_MINUTES: int = 30
+    EMAIL_VERIFY_MINUTES: int = 60
     LOGIN_LOCKOUT_FAILURES: int = 8
     LOGIN_LOCKOUT_MINUTES: int = 10
 

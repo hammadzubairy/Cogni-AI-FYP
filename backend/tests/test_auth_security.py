@@ -54,63 +54,79 @@ def _b64url(data: dict) -> str:
 
 @pytest.mark.api
 @pytest.mark.security
-def test_student_self_signup_enabled(client):
+async def test_student_self_signup_requires_email_verify(client):
+    email = "new.student@school.edu"
+    password = "Strong-Passw0rd!"
     resp = client.post(
         "/api/auth/register",
-        json={
-            "name": "New Student",
-            "email": "new.student@school.edu",
-            "password": "Strong-Passw0rd!",
-            "role": "student",
-        },
+        json={"name": "New Student", "email": email, "password": password},
     )
     assert resp.status_code == 201
     body = resp.json()
-    assert body["user"]["role"] == "student"
-    assert body["user"]["dept_id"] is None
-    assert "password" not in body["user"]
-    assert "password_hash" not in body["user"]
+    assert body["status"] == "pending_verification"
+    assert body["email"] == email
+    assert "access_token" not in body
+
+    blocked = client.post("/api/auth/login", json={"email": email, "password": password})
+    assert blocked.status_code == 403
+    assert "verify" in blocked.json()["detail"].lower()
+
+    import secrets
+
+    from app.services.passwords import hash_reset_token
+
+    conn = AsyncMongoClient(settings.MONGO_URI)
+    user = await conn[settings.MONGO_DB].users.find_one({"email": email})
+    assert user["status"] == "pending_verification"
+    assert user["role"] == "student"
+    row = await conn[settings.MONGO_DB].email_verifications.find_one({"user_id": str(user["_id"])})
+    assert row is not None
+
+    raw = secrets.token_urlsafe(32)
+    await conn[settings.MONGO_DB].email_verifications.delete_many({"user_id": str(user["_id"])})
+    await conn[settings.MONGO_DB].email_verifications.insert_one(
+        {
+            "token_hash": hash_reset_token(raw),
+            "user_id": str(user["_id"]),
+            "expires_at": datetime.now(UTC) + timedelta(hours=1),
+            "used": False,
+        }
+    )
+    await conn.close()
+
+    verified = client.post("/api/auth/verify-email", json={"token": raw})
+    assert verified.status_code == 204, verified.text
+
+    ok = client.post("/api/auth/login", json={"email": email, "password": password})
+    assert ok.status_code == 200
+    assert ok.json()["user"]["role"] == "student"
+    assert ok.json()["user"]["status"] == "active"
 
 
 @pytest.mark.api
 @pytest.mark.security
-def test_teacher_self_signup_with_department(client):
+def test_staff_roles_rejected_on_public_register(client):
     depts = client.get("/api/public/departments")
     assert depts.status_code == 200
-    assert len(depts.json()) >= 1
-    dept_id = depts.json()[0]["id"]
+    dept_id = depts.json()[0]["id"] if depts.json() else None
 
-    resp = client.post(
-        "/api/auth/register",
-        json={
-            "name": "New Teacher",
-            "email": "new.teacher@school.edu",
-            "password": "Strong-Passw0rd!",
-            "role": "teacher",
-            "dept_id": dept_id,
-        },
-    )
-    assert resp.status_code == 201, resp.text
-    body = resp.json()
-    assert body["user"]["role"] == "teacher"
-    assert body["user"]["dept_id"] == dept_id
-
-
-@pytest.mark.api
-@pytest.mark.security
-def test_admin_self_signup(client):
-    resp = client.post(
-        "/api/auth/register",
-        json={
-            "name": "New Admin",
-            "email": "new.admin@school.edu",
-            "password": "Strong-Passw0rd!",
-            "role": "admin",
-        },
-    )
-    assert resp.status_code == 201, resp.text
-    assert resp.json()["user"]["role"] == "admin"
-    assert resp.json()["user"]["dept_id"] is None
+    for role, extra in [
+        ("teacher", {"dept_id": dept_id} if dept_id else {}),
+        ("hod", {"dept_id": dept_id} if dept_id else {}),
+        ("admin", {}),
+    ]:
+        resp = client.post(
+            "/api/auth/register",
+            json={
+                "name": f"New {role}",
+                "email": f"new.{role}@school.edu",
+                "password": "Strong-Passw0rd!",
+                "role": role,
+                **extra,
+            },
+        )
+        assert resp.status_code == 400, resp.text
+        assert "students only" in resp.json()["detail"].lower()
 
 
 @pytest.mark.api
@@ -123,8 +139,25 @@ def test_student_self_signup_duplicate_generic(client):
     }
     resp = client.post("/api/auth/register", json=payload)
     assert resp.status_code == 409
-    assert "already" not in resp.json()["detail"].lower() or True  # generic message
     assert resp.json()["detail"] == "Could not create that account."
+
+
+@pytest.mark.api
+@pytest.mark.security
+def test_verify_email_invalid_token(client):
+    resp = client.post("/api/auth/verify-email", json={"token": "not-a-real-token"})
+    assert resp.status_code == 400
+    assert "invalid" in resp.json()["detail"].lower()
+
+
+@pytest.mark.api
+@pytest.mark.security
+def test_resend_verification_always_202(client):
+    resp = client.post(
+        "/api/auth/resend-verification",
+        json={"email": "nobody-exists@school.edu"},
+    )
+    assert resp.status_code == 202
 
 
 @pytest.mark.api

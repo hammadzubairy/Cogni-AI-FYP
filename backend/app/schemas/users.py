@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from app.schemas.common import OutBase
 
 Role = Literal["admin", "hod", "teacher", "student"]
-UserStatus = Literal["active", "inactive"]
+UserStatus = Literal["active", "inactive", "pending_verification"]
 
 
 class UserOut(OutBase):

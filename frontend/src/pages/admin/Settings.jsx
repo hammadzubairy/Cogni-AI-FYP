@@ -226,10 +226,11 @@ export default function Settings() {
                     disabled={saving}
                   />
                   <span>
-                    <b>Allow self-signup</b>
+                    <b>Allow student self-signup</b>
                     <small>
-                      When on, anyone can create a student, teacher, HOD or admin account. When off,
-                      only admins can add users.
+                      When on, students can create an account (email verification required). Teachers,
+                      HODs and admins are always added by an admin. When off, only admins can add
+                      users.
                     </small>
                   </span>
                 </label>

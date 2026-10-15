@@ -46,6 +46,8 @@ async def create_indexes() -> None:
     await db.activity_log.create_index([("at", -1)])
     await db.password_resets.create_index("token_hash", unique=True)
     await db.password_resets.create_index("expires_at", expireAfterSeconds=0)
+    await db.email_verifications.create_index("token_hash", unique=True)
+    await db.email_verifications.create_index("expires_at", expireAfterSeconds=0)
     await db.login_failures.create_index("email")
     await db.login_failures.create_index("at", expireAfterSeconds=max(60, settings.LOGIN_LOCKOUT_MINUTES * 60))
     # At most one settings document (partial unique on a constant field).

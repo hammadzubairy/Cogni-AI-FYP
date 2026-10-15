@@ -7,12 +7,14 @@ error response uses the uniform shape `{"detail": "...", "code": "..."}`.
 |--------|------|---------|---------|----------|
 | GET | /api/health | public | — | `{status}` |
 | GET | /api/public/config | public | — | `{needs_setup, institution_name, current_term, student_signup_enabled}` |
-| GET | /api/public/departments | public | — | `[{id,code,name}]` for self-signup department picker |
+| GET | /api/public/departments | public | — | `[{id,code,name}]` (e.g. for staff onboarding / admin UIs) |
 | POST | /api/setup/admin | public (only while empty) | `{name,email,password,institution_name?,current_term?}` | `LoginResponse`, 201. 409 after first admin exists. |
-| POST | /api/auth/login | public | `{email, password}` | `{access_token, token_type, scope?, user{…,dept_name,institution_name,current_term,must_change_password}}`. `scope=change_password` when forced. 401 generic. 429 lockout. |
+| POST | /api/auth/login | public | `{email, password}` | `{access_token, token_type, scope?, user{…,dept_name,institution_name,current_term,must_change_password}}`. `scope=change_password` when forced. 401 generic. 403 if email unverified or inactive. 429 lockout. |
 | GET | /api/auth/me | authenticated | — | UserOut (+ dept_name, institution_name, current_term). 403 if scoped change-password token. |
 | POST | /api/auth/change-password | authenticated | `{current_password,new_password}` | `LoginResponse` (full session). |
-| POST | /api/auth/register | public | `{name,email,password,role?,dept_id?}` | Self-signup for student/teacher/hod/admin, 201. Teacher/HOD need `dept_id`. Honours signup settings / domain allowlist. |
+| POST | /api/auth/register | public | `{name,email,password,role?}` | Student self-signup only (`role` must be `student` or omitted). Creates `pending_verification` user and emails a verify link. 201 `{status,message,email}` (no JWT). Staff roles → 400. Honours signup toggle / domain allowlist. |
+| POST | /api/auth/verify-email | public | `{token}` | 204. Activates the student account. |
+| POST | /api/auth/resend-verification | public | `{email}` | 202 always (no enumeration). |
 | POST | /api/auth/forgot | public | `{email}` | 202 always. |
 | POST | /api/auth/reset | public | `{token,new_password}` | 204. |
 | GET | /api/admin/users | admin | query `?role=&q=` (both optional; `q` matches name or email, case-insensitive) | `[UserOut]` |

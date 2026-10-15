@@ -7,9 +7,12 @@ from app.schemas.auth import (
     ForgotRequest,
     LoginRequest,
     LoginResponse,
+    RegisterPendingOut,
     RegisterRequest,
+    ResendVerificationRequest,
     ResetRequest,
     TokenUser,
+    VerifyEmailRequest,
 )
 from app.schemas.users import UserOut
 from app.services import auth as auth_service
@@ -59,7 +62,7 @@ async def change_password(
     return LoginResponse(access_token=token, scope=scope, user=_token_user(fields))
 
 
-@router.post("/register", response_model=LoginResponse, status_code=201)
+@router.post("/register", response_model=RegisterPendingOut, status_code=201)
 async def register(payload: RegisterRequest, request: Request):
     check_login_rate_limit(request)
     user = await auth_service.register_user(
@@ -67,11 +70,21 @@ async def register(payload: RegisterRequest, request: Request):
         payload.email,
         payload.password,
         role=payload.role,
-        dept_id=payload.dept_id,
     )
-    token, scope = auth_service.issue_tokens_for(user)
-    fields = await auth_service.user_public_fields(user)
-    return LoginResponse(access_token=token, scope=scope, user=_token_user(fields))
+    return RegisterPendingOut(email=user["email"])
+
+
+@router.post("/verify-email", status_code=204)
+async def verify_email(payload: VerifyEmailRequest):
+    await auth_service.verify_email(payload.token)
+    return Response(status_code=204)
+
+
+@router.post("/resend-verification", status_code=202)
+async def resend_verification(payload: ResendVerificationRequest, request: Request):
+    check_login_rate_limit(request)
+    await auth_service.resend_verification(payload.email)
+    return {"status": "ok"}
 
 
 @router.post("/forgot", status_code=202)

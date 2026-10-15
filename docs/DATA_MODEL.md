@@ -4,7 +4,9 @@ This is the contract for every collection and field used across all phases.
 Field names are fixed; do not rename without updating this file first.
 
 ## users
-`id, name, email (unique, lowercase), password_hash, role, dept_id|null, status (active|inactive)`
+`id, name, email (unique, lowercase), password_hash, role, dept_id|null, status (active|inactive|pending_verification), must_change_password, token_version, created_at, created_by|null, last_login_at|null`
+
+Email verification tokens: `email_verifications` — `token_hash` (unique), `user_id`, `expires_at` (TTL), `used`.
 
 ## departments
 `id, code, name, hod_id|null, policy {min_clo:int, higher_order_pct:int, max_repeats:int}`

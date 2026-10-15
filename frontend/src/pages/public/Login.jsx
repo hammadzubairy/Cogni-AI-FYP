@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { ApiError } from '../../api/client'
+import * as api from '../../api'
 import { ROLE_HOME, useAuth } from '../../auth/AuthContext'
 import { Icon } from '../../components/IconSprite'
 import AuthShell from './AuthShell'
@@ -24,6 +25,9 @@ export default function Login() {
   useEffect(() => {
     if (location.state?.resetOk) {
       setNotice('Password updated. Sign in with your new password.')
+      navigate(location.pathname, { replace: true, state: {} })
+    } else if (location.state?.verifiedOk) {
+      setNotice('Email verified. Sign in with your password.')
       navigate(location.pathname, { replace: true, state: {} })
     }
   }, [location, navigate])
@@ -50,6 +54,27 @@ export default function Login() {
       const msg =
         err instanceof ApiError ? err.message : 'Sign in failed. Please try again.'
       setError(msg)
+      if (
+        err instanceof ApiError &&
+        typeof err.message === 'string' &&
+        err.message.toLowerCase().includes('verify your email')
+      ) {
+        setNotice('Need a new link? Use Resend below after entering your email.')
+      }
+      setSubmitting(false)
+    }
+  }
+
+  const onResendVerification = async () => {
+    if (!email.trim() || submitting) return
+    setSubmitting(true)
+    setError('')
+    try {
+      await api.resendVerification(email.trim().toLowerCase())
+      setNotice('If that account needs verification, we sent another email.')
+    } catch {
+      setNotice('Could not resend right now. Try again shortly.')
+    } finally {
       setSubmitting(false)
     }
   }
@@ -70,7 +95,7 @@ export default function Login() {
     <AuthShell
       title="Sign in"
       subtitle="Use the email and password from your institution."
-      sideBody="Create an account for any role when signup is enabled. Students join classes with a code from their teacher after signing up."
+      sideBody="Students can create an account when signup is enabled, then verify their email. Staff are added by an admin. Join a class with a code from your teacher after signing up."
     >
       {notice ? (
         <div className="callout blue" role="status">
@@ -135,10 +160,21 @@ export default function Login() {
         {signupEnabled ? (
           <>
             {' '}
-            · <Link to="/register">Create account</Link>
+            · <Link to="/register">Create student account</Link>
           </>
         ) : null}
       </p>
+      {notice && error && error.toLowerCase().includes('verify your email') ? (
+        <button
+          type="button"
+          className="btn ghost"
+          style={{ width: '100%', marginTop: 12 }}
+          onClick={onResendVerification}
+          disabled={submitting || !email.trim()}
+        >
+          Resend verification email
+        </button>
+      ) : null}
     </AuthShell>
   )
 }

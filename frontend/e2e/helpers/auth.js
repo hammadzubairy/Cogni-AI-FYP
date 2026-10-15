@@ -45,7 +45,10 @@ export async function clearSession(page) {
     await page.evaluate(() => localStorage.removeItem('cogni-token'))
     await page.goto('/login')
   }
-  await page.getByRole('heading', { name: 'Sign in' }).waitFor({ timeout: 20_000 })
+  // Empty DB redirects /login → /setup; accept either public auth screen.
+  const signIn = page.getByRole('heading', { name: 'Sign in' })
+  const setup = page.getByRole('heading', { name: /Create your institution/i })
+  await signIn.or(setup).first().waitFor({ timeout: 20_000 })
 }
 
 /**

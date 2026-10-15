@@ -38,7 +38,8 @@ cd backend
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-# Set APP_ENV=development, a strong JWT_SECRET, MONGO_URI, LLM_PROVIDER=mock
+# Set APP_ENV=development, a strong JWT_SECRET, MONGO_URI.
+# LLM: mock for local canned drafts, or Groq via openai + LLM_BASE_URL (see .env.example).
 uvicorn app.main:app --reload --port 8000
 
 # Frontend (other terminal)
@@ -149,13 +150,14 @@ Never run `--yes` against a database you have not named explicitly.
 
 ## Known limitations
 
-- No email verification for student signup
+- Student email verification requires working mail delivery (`SMTP_*`); without SMTP the link is printed by ConsoleMailer (dev/test)
 - JWT stored in `localStorage`
 - AI-writing detector is heuristic / advisory only
 - English-only product copy and prompts
 - No OCR for scanned PDFs
 - Login IP rate limit is in-memory per process
-- In-app notifications; email only for password reset when SMTP is set
+- In-app notifications; password-reset and verify emails when SMTP is set
+- Public signup is student-only; wireframe demo click-to-login accounts are not in the product
 
 ## Docs
 

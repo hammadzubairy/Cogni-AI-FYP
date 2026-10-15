@@ -13,6 +13,10 @@ function isResetPath(path) {
   return path.startsWith('/reset/')
 }
 
+function isVerifyPath(path) {
+  return path.startsWith('/verify/')
+}
+
 /**
  * Global guards: first-run setup, forced password change, and setup route lockout.
  */
@@ -31,7 +35,7 @@ export default function AuthRedirector({ children }) {
 
   const needsSetup = publicConfig?.needs_setup
 
-  if (needsSetup && path !== '/setup') {
+  if (needsSetup && path !== '/setup' && !isVerifyPath(path)) {
     return <Navigate to="/setup" replace />
   }
 
@@ -68,6 +72,7 @@ export default function AuthRedirector({ children }) {
     !needsSetup &&
     PUBLIC_AUTH_PATHS.has(path) === false &&
     !isResetPath(path) &&
+    !isVerifyPath(path) &&
     path.startsWith('/app')
   ) {
     /* app routes handled by RoleRoute */

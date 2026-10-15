@@ -243,6 +243,8 @@ def test_all_openapi_routes_reachable(client, hit_routes):
             "email": f"cov.reg.{tag}@school.edu",
             "password": "Strong-Passw0rd!",
         }),
+        ("POST", "/api/auth/verify-email", None, {"token": "not-a-real-token"}),
+        ("POST", "/api/auth/resend-verification", None, {"email": f"cov.reg.{tag}@school.edu"}),
         ("POST", "/api/auth/reset", None, {"token": "not-a-real-token", "new_password": "Strong-Passw0rd!"}),
         # needs_setup is false on seeded DB → expect 409
         ("POST", "/api/setup/admin", None, {

@@ -11,6 +11,7 @@ const LLM_PROVIDER = process.env.LLM_PROVIDER || 'mock'
 
 export default defineConfig({
   testDir: './e2e',
+  testIgnore: ['**/fresh-install.spec.js'],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   // Shared seeded DB — one worker avoids cross-spec races; retries inflate runtime.

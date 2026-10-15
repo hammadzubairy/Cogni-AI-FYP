@@ -34,55 +34,35 @@ test.describe('App tour with screenshots', () => {
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
     await snap(page, 'public-login', 'Sign-in page')
 
-    await page.getByRole('link', { name: /Create account/i }).click()
-    await expect(page.getByRole('heading', { name: 'Create account' })).toBeVisible()
-    await snap(page, 'public-register-student', 'Register — Student role selected')
-
-    await page.locator('#r-role').selectOption('teacher')
-    await expect(page.locator('#r-dept')).toBeVisible()
-    await snap(page, 'public-register-teacher', 'Register — Teacher role + department')
-
-    await page.locator('#r-role').selectOption('hod')
-    await snap(page, 'public-register-hod', 'Register — HOD role')
-
-    await page.locator('#r-role').selectOption('admin')
-    await expect(page.locator('#r-dept')).toHaveCount(0)
-    await snap(page, 'public-register-admin', 'Register — Admin role')
+    await page.getByRole('link', { name: /Create (student )?account/i }).click()
+    await expect(page.getByRole('heading', { name: /Create student account/i })).toBeVisible()
+    await snap(page, 'public-register-student', 'Register — student self-signup')
 
     await page.goto('/forgot')
     await expect(page.getByRole('heading', { name: /Forgot|Reset/i })).toBeVisible()
     await snap(page, 'public-forgot', 'Forgot password')
   })
 
-  test('SS — signup student then land on student portal', async ({ page }) => {
+  test('SS — signup student then check-email gate', async ({ page }) => {
     const tag = Date.now().toString(36)
     await clearSession(page)
     await page.goto('/register')
-    await page.locator('#r-role').selectOption('student')
     await page.locator('#r-name').fill(`E2E Student ${tag}`)
     await page.locator('#r-email').fill(`e2e.student.${tag}@school.edu`)
     await page.locator('#r-pw').fill('Strong-Passw0rd!')
     await snap(page, 'signup-student-filled', 'Register form filled for new student')
     await page.getByRole('button', { name: 'Create account' }).click()
-    await page.waitForURL(/\/app\/student/, { timeout: 30_000 })
-    await expect(page.getByText(/STUDENT PORTAL/i).first()).toBeVisible()
-    await snap(page, 'signup-student-home', 'New student lands on student home')
+    await expect(page.getByRole('heading', { name: /Check your email/i })).toBeVisible({
+      timeout: 30_000,
+    })
+    await snap(page, 'signup-student-verify', 'New student must verify email before sign-in')
   })
 
-  test('SS — signup teacher with department', async ({ page }) => {
-    const tag = Date.now().toString(36)
-    await clearSession(page)
-    await page.goto('/register')
-    await page.locator('#r-role').selectOption('teacher')
-    await page.locator('#r-dept').selectOption({ index: 1 })
-    await page.locator('#r-name').fill(`E2E Teacher ${tag}`)
-    await page.locator('#r-email').fill(`e2e.teacher.${tag}@school.edu`)
-    await page.locator('#r-pw').fill('Strong-Passw0rd!')
-    await snap(page, 'signup-teacher-filled', 'Register form filled for new teacher')
-    await page.getByRole('button', { name: 'Create account' }).click()
-    await page.waitForURL(/\/app\/teacher/, { timeout: 30_000 })
-    await expect(page.getByText(/TEACHER PORTAL/i).first()).toBeVisible()
-    await snap(page, 'signup-teacher-home', 'New teacher lands on teacher home')
+  test('SS — admin add staff (staff not public signup)', async ({ page }) => {
+    await loginAs(page, 'admin')
+    await page.goto('/app/admin/users/new')
+    await expect(page.getByRole('heading', { name: /Add/i })).toBeVisible()
+    await snap(page, 'signup-staff-via-admin', 'Staff accounts are created by admin Add Staff')
   })
 
   test('SS — admin portal pages', async ({ page }) => {
@@ -166,19 +146,22 @@ test.describe('App tour with screenshots', () => {
     await snap(page, 'teacher-create-exam', 'Teacher generate draft paper')
 
     await page.goto('/app/teacher/exams')
-    const paperBtn = page.getByRole('button', { name: 'Paper' }).first()
-    if (await paperBtn.count()) {
-      await paperBtn.click()
-      await page.waitForURL(/\/app\/teacher\/exams\/[^/]+/, { timeout: 15_000 })
-      await snap(page, 'teacher-exam-editor', 'Teacher exam / paper editor')
-    }
+    await expect(page.getByRole('button', { name: 'Paper' }).first()).toBeVisible({
+      timeout: 20_000,
+    })
+    await page.getByRole('button', { name: 'Paper' }).first().click()
+    await page.waitForURL(/\/app\/teacher\/exams\/[^/]+/, { timeout: 20_000 })
+    await expect(page.getByRole('heading').first()).toBeVisible()
+    await snap(page, 'teacher-exam-editor', 'Teacher exam / paper editor')
+
     await page.goto('/app/teacher/exams')
-    const resultsBtn = page.getByRole('button', { name: 'Results' }).first()
-    if (await resultsBtn.count()) {
-      await resultsBtn.click()
-      await page.waitForURL(/\/results/, { timeout: 15_000 }).catch(() => {})
-      await snap(page, 'teacher-results', 'Teacher exam results')
-    }
+    await expect(page.getByRole('button', { name: 'Results' }).first()).toBeVisible({
+      timeout: 20_000,
+    })
+    await page.getByRole('button', { name: 'Results' }).first().click()
+    await page.waitForURL(/\/results/, { timeout: 20_000 })
+    await expect(page.getByRole('heading', { name: /Results/i }).first()).toBeVisible()
+    await snap(page, 'teacher-results', 'Teacher exam results')
 
     await page.goto('/app/teacher/flags')
     await expect(page.getByRole('heading', { name: /AI-writing flags/i })).toBeVisible()
@@ -204,11 +187,18 @@ test.describe('App tour with screenshots', () => {
     const startBtn = page.getByRole('button', { name: /Start exam/i }).or(
       page.getByRole('link', { name: /Start exam/i }),
     )
-    if ((await startBtn.count()) > 0) {
-      await startBtn.first().click()
-      await page.waitForTimeout(800)
-      await snap(page, 'student-take-exam', 'Student take exam (start / in progress)')
-    }
+    await expect(startBtn.first()).toBeVisible({ timeout: 20_000 })
+    await startBtn.first().click()
+    await expect(page.getByRole('button', { name: /^Start exam$/i })).toBeVisible({
+      timeout: 20_000,
+    })
+    await snap(page, 'student-take-exam', 'Student take exam — before you start gate')
+    await page.getByRole('button', { name: /^Start exam$/i }).click()
+    await expect(page.locator('#timer')).toBeVisible({ timeout: 30_000 })
+    await expect(page.locator('aside[aria-label="Question navigator"]')).toBeVisible({
+      timeout: 15_000,
+    })
+    await snap(page, 'student-take-exam-live', 'Student take exam — live timer and navigator')
 
     await page.goto('/app/student/results')
     await expect(page.getByRole('heading', { name: /Results/i })).toBeVisible()

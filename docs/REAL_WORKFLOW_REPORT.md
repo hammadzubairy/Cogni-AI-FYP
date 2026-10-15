@@ -36,7 +36,7 @@
 |-------|----------|----------------------|
 | Backend pytest | 154 passed, 2 skipped, 291s | **158 passed, 1 skipped, 0 failed** (~326s) |
 | Frontend build | pass | pass |
-| Playwright | 33 passed (pre-conversion) | Helpers use email/password; **full suite / fresh-install.spec not re-run** |
+| Playwright | 33 passed (pre-conversion) | Helpers use email/password; **fresh-install.spec + playwright.fresh.config.js added** |
 | no-demo guard | n/a | **passes** (`tests/test_no_demo.py`) |
 
 ## Fresh-install journey
@@ -45,8 +45,8 @@
 |------|--------|
 | Empty DB + indexes via lifespan | Implemented |
 | `/setup` + CLI create-admin | Implemented |
-| Playwright `fresh-install.spec.js` | **UNFIXED** (not written this session) |
-| API `test_fresh_install.py` | **UNFIXED** (not written this session) |
+| Playwright `fresh-install.spec.js` | **Implemented** (`npm run test:e2e:fresh`) |
+| API `test_fresh_install.py` | **Implemented** (`tests/e2e/test_fresh_install.py`) |
 
 ## Phase file lists (uncommitted)
 
@@ -67,8 +67,8 @@
 
 ## UNFIXED / known gaps
 
-1. **`frontend/e2e/fresh-install.spec.js`** and full Playwright re-green after login UI change.
-2. **`backend/tests/e2e/test_fresh_install.py`** HTTP empty-DB journey.
+1. **DATA_MODEL.md** may still lag newer auth fields (`pending_verification`, email_verifications).
+2. ~~fresh-install Playwright / pytest~~ — done.
 3. **DATA_MODEL.md / API.md** not fully rewritten for every new field (REAL_WORKFLOW.md is the design source).
 4. **Department delete / teacher deactivate hard rules** from section E only partially applied (onboarding + llm-status done; full delete guards may still be soft).
 5. **pytest-randomly** / 3× full suite not completed in this session.
