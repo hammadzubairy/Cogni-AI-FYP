@@ -339,8 +339,25 @@ class MockLLM(LLMClient):
         if not chunks:
             return {"answer": "I don't have any material to answer from."}
         text = chunks[0].get("text", "")
-        sentences = re.split(r"(?<=[.!?])\s+", text.strip())
+        heading = chunks[0].get("heading") or "the material"
+        sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
+        stem = sentences[0] if sentences else f"Key ideas from {heading}."
+        question = (payload.get("question") or "").lower()
+        if any(w in question for w in ("practice", "quiz me", "test me", "exam-style")):
+            return {
+                "answer": (
+                    "Practice question\n\n"
+                    f"Using ideas from {heading}, answer the following.\n\n"
+                    f"a. Explain the main point in your own words: {stem}\n"
+                    "b. Give one concrete example from the material that supports your explanation.\n\n"
+                    "Good answer\n\n"
+                    f"- Restate the core idea from {heading} clearly.\n"
+                    "- Tie the example back to that idea with a short justification."
+                )
+            }
         answer = " ".join(sentences[:2]).strip()
+        if len(sentences) > 1:
+            answer = f"{sentences[0]}\n\n{sentences[1]}"
         return {"answer": answer or "I don't have any material to answer from."}
 
     def _grade(self, payload: dict) -> dict:

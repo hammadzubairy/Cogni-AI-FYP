@@ -61,7 +61,7 @@ section.block{padding-block:72px}
 .role .who{font-size:14px;color:var(--color-muted-foreground);margin:4px 0 14px}
 .role ul{margin:0;padding-left:18px;color:var(--color-muted-foreground);font-size:14.5px}
 .role li{margin-bottom:6px}
-.role.ra{--rc:var(--color-ring)}.role.rh{--rc:var(--color-accent)}.role.rt{--rc:var(--color-primary)}.role.rs{--rc:var(--color-ai)}
+.role.ra{--rc:var(--role-admin)}.role.rh{--rc:var(--role-hod)}.role.rt{--rc:var(--role-teacher)}.role.rs{--rc:var(--role-student)}
 .trust{background:var(--color-background);color:var(--color-foreground);border-block:1px solid var(--color-border)}
 .trust .wrap{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center}
 @media(max-width:900px){.trust .wrap{grid-template-columns:1fr;gap:32px}}
