@@ -47,7 +47,7 @@ function buildItems(data, classById) {
     items.push({
       t: `${r.kind} requested for ${code}`,
       s: `Due ${r.due}${r.note ? ` · ${r.note}` : ''}`,
-      tag: ['Request', 'p-grey'],
+      tag: ['Request', 'p-progress'],
       btn: 'Start paper',
       to: `/app/teacher/exams/new?req=${encodeURIComponent(r.id)}`,
     })

@@ -91,7 +91,7 @@ export default function ClassDetail() {
       .forEach((x) => n.push([`${x.title} approved`, 'p-good']))
     exams
       .filter((x) => x.status === 'pending')
-      .forEach((x) => n.push([`${x.title} with HOD`, 'p-grey']))
+      .forEach((x) => n.push([`${x.title} with HOD`, 'p-progress']))
     return n
   }, [cls, exams])
 

@@ -1,7 +1,7 @@
-/** Exam status map from v7 `ST` / `pill`. */
+/** Exam status → label + pill tone (Final Color Palette). */
 export const ST = {
   draft: ['Draft', 'p-grey'],
-  pending: ['Pending HOD', 'p-warn'],
+  pending: ['Pending HOD', 'p-progress'],
   returned: ['Returned', 'p-bad'],
   approved: ['Approved', 'p-good'],
   published: ['Live', 'p-blue'],
@@ -18,6 +18,6 @@ export function statusClass(status) {
 
 export function pctColor(v) {
   if (v >= 75) return 'var(--color-success)'
-  if (v >= 60) return 'var(--color-accent)'
+  if (v >= 60) return 'var(--color-warning)'
   return 'var(--color-destructive)'
 }
