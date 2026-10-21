@@ -109,12 +109,40 @@ def _assert_teacher_owns(user: CurrentUser, cls: dict) -> None:
         raise HTTPException(status_code=403, detail="You do not own this class.")
 
 
+async def _student_roster(student_ids: list[str]) -> list[dict]:
+    """Resolve enrolled student ids to {id, name, email} for teacher/HOD views."""
+    if not student_ids:
+        return []
+    db = get_db()
+    oids = []
+    for sid in student_ids:
+        try:
+            oids.append(oid(sid))
+        except Exception:
+            continue
+    if not oids:
+        return []
+    by_id: dict[str, dict] = {}
+    async for u in db.users.find(
+        {"_id": {"$in": oids}}, {"name": 1, "email": 1}
+    ):
+        by_id[str(u["_id"])] = {
+            "id": str(u["_id"]),
+            "name": u.get("name") or "Student",
+            "email": u.get("email") or "",
+        }
+    return [by_id[sid] for sid in student_ids if sid in by_id]
+
+
 async def get_class(user: CurrentUser, class_id: str) -> dict:
     cls = await _get_class_or_404(class_id)
     _assert_access(user, cls)
     out = await _with_counts(cls)
     if user.role == "student":
         out["student_ids"] = []
+        out["students"] = []
+    else:
+        out["students"] = await _student_roster(cls.get("student_ids", []))
     return out
 
 

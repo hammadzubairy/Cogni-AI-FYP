@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     JWT_EXPIRE_MIN: int = 1440
     LLM_PROVIDER: str = "mock"
     LLM_MODEL: str = ""
+    LLM_OCR_MODEL: str = ""
     LLM_API_KEY: str = ""
     LLM_BASE_URL: str = ""
     AI_DETECTOR: str = "heuristic"

@@ -12,7 +12,7 @@ from app.core.deps import CurrentUser
 from app.prompts.study_assistant import ASK_SYSTEM_PROMPT, build_ask_user_prompt
 from app.services.llm import call_json, get_llm_client
 
-TOP_K = 3
+TOP_K = 6
 MIN_QUESTION_CHARS = 3
 
 
@@ -83,8 +83,8 @@ async def ask_material(student: CurrentUser, material_id: str, question: str) ->
         llm,
         ASK_SYSTEM_PROMPT,
         build_ask_user_prompt(question, selected),
-        max_tokens=400,
-        temperature=0.3,
+        max_tokens=900,
+        temperature=0.4,
     )
     answer = str(data.get("answer", "")).strip()
     sources = [{"page": c.get("page"), "heading": c.get("heading")} for c in selected]

@@ -25,9 +25,10 @@ export default function App() {
     <ThemeProvider>
       <AuthProvider>
         <ToastProvider>
-          <ModalProvider>
-            <IconSprite />
-            <BrowserRouter>
+          <IconSprite />
+          <BrowserRouter>
+            {/* Modal must sit inside the router so modal content can use <Link>. */}
+            <ModalProvider>
               <AuthRedirector>
                 <Routes>
                   <Route path="/" element={<Landing />} />
@@ -76,8 +77,8 @@ export default function App() {
                   <Route path="*" element={<NotFound />} />
                 </Routes>
               </AuthRedirector>
-            </BrowserRouter>
-          </ModalProvider>
+            </ModalProvider>
+          </BrowserRouter>
         </ToastProvider>
       </AuthProvider>
     </ThemeProvider>

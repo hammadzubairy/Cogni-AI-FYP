@@ -54,7 +54,11 @@ export default function ClassDetail() {
       setCls(c)
       setExams(xs)
       setMaterials(mats)
-      setDirectory({})
+      const dir = {}
+      ;(c.students || []).forEach((s) => {
+        dir[s.id] = { name: s.name, email: s.email }
+      })
+      setDirectory(dir)
       const idx = (allClasses || []).findIndex((x) => x.id === id)
       setClassIndex(idx >= 0 ? idx : 0)
     } catch (err) {
@@ -93,9 +97,10 @@ export default function ClassDetail() {
 
   async function onCopyJoin() {
     const ok = await copyText(cls.join_code)
-    toast(ok ? `Copied ${cls.join_code}` : 'Could not copy. Select the code and copy manually.', {
-      type: ok ? undefined : 'error',
-    })
+    // Success: silent copy (no toast). Only surface failures.
+    if (!ok) {
+      toast('Could not copy. Select the code and copy manually.', { type: 'error' })
+    }
   }
 
   async function onAddStudent() {

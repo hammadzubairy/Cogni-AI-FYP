@@ -39,7 +39,7 @@ python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
 # Set APP_ENV=development, a strong JWT_SECRET, MONGO_URI.
-# LLM: mock for local canned drafts, or Groq via openai + LLM_BASE_URL (see .env.example).
+# LLM: mock for local canned drafts, or OpenRouter via openai + LLM_BASE_URL (see .env.example).
 uvicorn app.main:app --reload --port 8000
 
 # Frontend (other terminal)
@@ -109,9 +109,10 @@ Use **two Vercel projects** from the same GitHub repo (recommended).
 | `MONGO_DB` | `cogni` (not `*_dev` / `*_test`) |
 | `JWT_SECRET` | ≥32 random chars |
 | `LLM_PROVIDER` | `openai` |
-| `LLM_BASE_URL` | `https://api.groq.com/openai/v1` |
-| `LLM_MODEL` | `qwen/qwen3.8-27b` |
-| `LLM_API_KEY` | your Groq key |
+| `LLM_BASE_URL` | `https://openrouter.ai/api/v1` |
+| `LLM_MODEL` | `minimax/minimax-m3.1-flash:free` |
+| `LLM_OCR_MODEL` | `nvidia/nemotron-3.5-super-vl:free` |
+| `LLM_API_KEY` | your OpenRouter key |
 | `CORS_ORIGINS` | frontend URL (set after step C) |
 | `PUBLIC_BASE_URL` | frontend URL |
 
@@ -154,7 +155,7 @@ Never run `--yes` against a database you have not named explicitly.
 - JWT stored in `localStorage`
 - AI-writing detector is heuristic / advisory only
 - English-only product copy and prompts
-- No OCR for scanned PDFs
+- Scanned PDFs use OpenRouter multimodal OCR (first pages); very large scans may still need paste-notes
 - Login IP rate limit is in-memory per process
 - In-app notifications; password-reset and verify emails when SMTP is set
 - Public signup is student-only; wireframe demo click-to-login accounts are not in the product

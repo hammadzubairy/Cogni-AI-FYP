@@ -221,14 +221,25 @@ export default function CreateExam() {
   function onPipeError(err) {
     setBusy(false)
     setPipePromise(null)
-    const msg = err instanceof ApiError ? err.message : 'Generation failed.'
-    const code = err instanceof ApiError ? err.code : ''
-    if (code === 'LLM_FAILED') {
-      setLlmFailed(msg)
-    } else {
-      toast(msg, { type: 'error' })
-      setFieldErrors({ materials: msg })
+    const raw = err instanceof ApiError ? err.message : 'Generation failed.'
+    // Never dump raw provider JSON / token-limit noise at teachers.
+    let msg = raw
+    const lower = String(raw).toLowerCase()
+    if (
+      lower.includes('too large') ||
+      lower.includes('413') ||
+      lower.includes('itpm') ||
+      lower.includes('rate_limit') ||
+      lower.includes("{'error'") ||
+      lower.includes('{"error"')
+    ) {
+      msg =
+        'The AI could not finish this draft — the material may be too large for one pass, or the service was busy. Try fewer source files or a shorter document, then press Retry.'
+    } else if (msg.length > 220) {
+      msg = `${msg.slice(0, 200).trim()}…`
     }
+    setLlmFailed(msg)
+    setFieldErrors({ materials: msg })
   }
 
   if (loading) return <ShellLoading label="Loading…" />
@@ -309,8 +320,9 @@ export default function CreateExam() {
         <div className="callout red">
           <Icon name="alert" />
           <div>
-            <b>Generation failed.</b> {llmFailed}
-            <div style={{ marginTop: 8 }}>
+            <b>Could not generate this draft.</b>
+            <div style={{ marginTop: 6 }}>{llmFailed}</div>
+            <div style={{ marginTop: 10 }}>
               <button type="button" className="btn small primary" onClick={startGenerate}>
                 Retry
               </button>
@@ -344,15 +356,14 @@ export default function CreateExam() {
                 error={fieldErrors.materials}
               >
                 <div
-                  className="panel"
+                  className="panel mat-pick"
                   style={{ padding: 10, maxHeight: 160, overflow: 'auto', margin: 0 }}
                 >
                   {materials.length ? (
                     materials.map((m) => (
                       <label
                         key={m.id}
-                        className="row"
-                        style={{ gap: 8, marginBottom: 6, cursor: 'pointer' }}
+                        className={`mat-pick-row${materialIds.includes(m.id) ? ' on' : ''}`}
                       >
                         <input
                           type="checkbox"
@@ -360,7 +371,8 @@ export default function CreateExam() {
                           disabled={busy}
                           onChange={() => toggleMaterial(m.id)}
                         />
-                        <span>{m.name}</span>
+                        <span className="mat-pick-box" aria-hidden="true" />
+                        <span className="mat-pick-name">{m.name}</span>
                       </label>
                     ))
                   ) : (
@@ -495,15 +507,7 @@ export default function CreateExam() {
         </div>
 
         <Panel
-          title={
-            <h3 style={{ display: 'flex', gap: 8, alignItems: 'center', margin: 0 }}>
-              Generation pipeline{' '}
-              <span className="chip-ai">
-                <Icon name="spark" />
-                AI
-              </span>
-            </h3>
-          }
+          title={<h3 style={{ margin: 0 }}>Generation steps</h3>}
           headerRight={
             <span className="small" role="status">
               {busy ? 'Working…' : 'Ready'}

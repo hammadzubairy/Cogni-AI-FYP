@@ -6,6 +6,9 @@ pymongo>=4.9
 pyjwt
 bcrypt
 pypdf
+pymupdf
+python-docx
+python-pptx
 python-multipart
 httpx
 openai

@@ -46,6 +46,7 @@ function NewClassForm({ closeModal, toast, navigate }) {
       } else {
         setErrors({ name: msg })
       }
+    } finally {
       setBusy(false)
     }
   }

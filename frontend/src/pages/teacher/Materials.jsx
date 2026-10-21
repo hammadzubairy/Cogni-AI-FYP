@@ -13,7 +13,9 @@ import { useConfirm } from '../../components/ConfirmModal'
 import { useToast } from '../../components/Toast'
 import { formatShortDate } from '../../utils/format'
 import {
+  isMaterialFile,
   kindLabel,
+  MATERIAL_ACCEPT,
   MATERIAL_PIPE_STEPS,
   MIN_PASTE_CHARS,
   SCANNED_PDF_MESSAGE,
@@ -35,13 +37,14 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
   const [materials, setMaterials] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [file, setFile] = useState(null)
+  const [files, setFiles] = useState([])
   const [notes, setNotes] = useState('')
   const [notesName, setNotesName] = useState('')
   const [fieldError, setFieldError] = useState('')
   const [scannedCallout, setScannedCallout] = useState(false)
   const [pipePromise, setPipePromise] = useState(null)
   const [busy, setBusy] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState('')
   const dragDepth = useRef(0)
   const [dragging, setDragging] = useState(false)
 
@@ -106,23 +109,55 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
   const pasteWords = wordCount(notes)
   const pasteChars = notes.trim().length
 
-  function acceptPdf(f) {
-    if (!f) return
-    if (!/\.pdf$/i.test(f.name)) {
-      toast('Choose a .pdf file', { type: 'error' })
-      return
+  function acceptFiles(list) {
+    const incoming = Array.from(list || [])
+    if (!incoming.length) return
+    const good = []
+    const bad = []
+    incoming.forEach((f) => {
+      if (isMaterialFile(f.name)) good.push(f)
+      else bad.push(f.name)
+    })
+    if (bad.length) {
+      toast(`Skipped unsupported file(s): ${bad.slice(0, 3).join(', ')}`, { type: 'error' })
     }
-    setFile(f)
+    if (!good.length) return
+    setFiles((prev) => {
+      const names = new Set(prev.map((f) => `${f.name}:${f.size}`))
+      const merged = [...prev]
+      good.forEach((f) => {
+        const key = `${f.name}:${f.size}`
+        if (!names.has(key)) {
+          names.add(key)
+          merged.push(f)
+        }
+      })
+      return merged
+    })
     setScannedCallout(false)
     setFieldError('')
-    toast(`${f.name} ready. Press Process material.`)
   }
 
   function onDrop(e) {
     e.preventDefault()
     dragDepth.current = 0
     setDragging(false)
-    acceptPdf(e.dataTransfer?.files?.[0])
+    acceptFiles(e.dataTransfer?.files)
+  }
+
+  async function uploadFilesQueue(queue) {
+    let last = null
+    let ok = 0
+    for (let i = 0; i < queue.length; i += 1) {
+      const f = queue[i]
+      setUploadProgress(`Uploading ${i + 1} of ${queue.length}: ${f.name}`)
+      const fd = new FormData()
+      fd.append('file', f)
+      fd.append('name', f.name)
+      last = await api.uploadMaterialPdf(activeClassId, fd)
+      ok += 1
+    }
+    return { last, ok, total: queue.length }
   }
 
   function startUpload() {
@@ -132,17 +167,15 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
     }
     setScannedCallout(false)
     setFieldError('')
+    setUploadProgress('')
 
     if (tab === 'pdf') {
-      if (!file) {
-        toast('Choose a PDF first', { type: 'error' })
+      if (!files.length) {
+        toast('Choose at least one PDF, DOCX, or PPTX file', { type: 'error' })
         return
       }
-      const fd = new FormData()
-      fd.append('file', file)
-      fd.append('name', file.name)
       setBusy(true)
-      setPipePromise(api.uploadMaterialPdf(activeClassId, fd))
+      setPipePromise(uploadFilesQueue(files))
       return
     }
 
@@ -160,15 +193,25 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
   async function onPipeDone(result) {
     setBusy(false)
     setPipePromise(null)
-    setFile(null)
+    setFiles([])
     setNotes('')
     setNotesName('')
+    setUploadProgress('')
     if (fileRef.current) fileRef.current.value = ''
     try {
       if (fixedClassId) await refreshMaterials([], fixedClassId)
       else await refreshMaterials(classes)
     } catch {
       /* ignore refresh error */
+    }
+    if (result && typeof result.ok === 'number') {
+      toast(
+        `${result.ok} file${result.ok === 1 ? '' : 's'} saved` +
+          (result.last?.chunk_count != null
+            ? ` · last file ${result.last.chunk_count} chunk${result.last.chunk_count === 1 ? '' : 's'}`
+            : ''),
+      )
+      return
     }
     const chunks = result?.chunk_count ?? 0
     toast(`Material saved · ${chunks} chunk${chunks === 1 ? '' : 's'}`)
@@ -177,9 +220,10 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
   function onPipeError(err) {
     setBusy(false)
     setPipePromise(null)
+    setUploadProgress('')
     const code = err instanceof ApiError ? err.code : ''
     const msg = err instanceof ApiError ? err.message : 'Upload failed.'
-    if (code === 'SCANNED_PDF' || msg === SCANNED_PDF_MESSAGE) {
+    if (code === 'SCANNED_PDF' || /scanned|OCR/i.test(msg)) {
       setScannedCallout(true)
     }
     setFieldError(msg)
@@ -253,7 +297,7 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
               setScannedCallout(false)
             }}
             items={[
-              { id: 'pdf', label: 'PDF' },
+              { id: 'pdf', label: 'Files' },
               { id: 'text', label: 'Paste notes' },
             ]}
           />
@@ -289,23 +333,60 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={onDrop}
               >
-                <Icon name={file ? 'check' : 'upload'} />
-                <b>{file ? file.name : 'Choose a PDF'}</b>
+                <Icon name={files.length ? 'check' : 'upload'} />
+                <b>
+                  {files.length
+                    ? `${files.length} file${files.length === 1 ? '' : 's'} selected`
+                    : 'Choose PDF, DOCX, or PPTX'}
+                </b>
                 <span>
-                  {file
-                    ? 'Ready. Press Process material, or choose a different file.'
-                    : 'Text-based PDFs only (selectable text). There is no OCR yet — scanned image PDFs and PowerPoint (.ppt/.pptx) are not supported. Use Paste notes for typed text.'}
+                  {files.length
+                    ? files.map((f) => f.name).join(' · ')
+                    : 'Upload one or more files. Scanned PDFs use OCR. Presentations and Word docs are supported.'}
                 </span>
               </label>
               <input
                 ref={fileRef}
                 type="file"
                 id="mat-file"
-                accept=".pdf,application/pdf"
+                accept={MATERIAL_ACCEPT}
+                multiple
                 className="sr-only"
                 disabled={busy}
-                onChange={(e) => acceptPdf(e.target.files?.[0])}
+                onChange={(e) => {
+                  acceptFiles(e.target.files)
+                  e.target.value = ''
+                }}
               />
+              {files.length ? (
+                <div className="file-queue" style={{ marginTop: 10 }}>
+                  {files.map((f) => (
+                    <div className="lrow" key={`${f.name}:${f.size}`} style={{ padding: '8px 0' }}>
+                      <div className="grow">
+                        <b>{f.name}</b>
+                        <div className="small">{Math.max(1, Math.round(f.size / 1024))} KB</div>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn small"
+                        disabled={busy}
+                        onClick={() =>
+                          setFiles((prev) =>
+                            prev.filter((x) => !(x.name === f.name && x.size === f.size)),
+                          )
+                        }
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+              {uploadProgress ? (
+                <p className="small" style={{ marginTop: 8 }}>
+                  {uploadProgress}
+                </p>
+              ) : null}
             </>
           ) : (
             <>
