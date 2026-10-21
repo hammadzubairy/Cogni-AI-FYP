@@ -9,12 +9,12 @@
 .btn:disabled{opacity:.55;box-shadow:none}
 .btn.primary{background:var(--color-primary);border-color:var(--color-primary);color:var(--color-on-primary)}
 .btn.primary:hover:not(:disabled){background:var(--color-ring);border-color:var(--color-ring);color:var(--color-on-primary)}
-.btn.good{background:var(--color-success-strong);border-color:var(--color-success-strong);color:#fff}
-.btn.good:hover:not(:disabled){background:var(--color-success-strong);border-color:var(--color-success-strong);color:#fff}
-.btn.bad{color:var(--color-destructive);border-color:color-mix(in srgb,var(--color-destructive) 35%,transparent);background:var(--color-card)}
-.btn.bad:hover:not(:disabled){background:var(--color-destructive-muted);border-color:var(--color-destructive);color:var(--color-destructive)}
-.btn.bad.solid{background:var(--color-destructive-strong);border-color:var(--color-destructive-strong);color:#fff}
-.btn.bad.solid:hover:not(:disabled){background:var(--color-destructive-strong);color:#fff}
+.btn.good{background:var(--color-success);border-color:var(--color-success);color:#fff}
+.btn.good:hover:not(:disabled){background:color-mix(in srgb,var(--color-success) 88%,var(--color-foreground));border-color:transparent;color:#fff}
+.btn.bad{color:var(--color-destructive-fg);border-color:color-mix(in srgb,var(--color-destructive) 40%,transparent);background:var(--color-card)}
+.btn.bad:hover:not(:disabled){background:var(--color-destructive-muted);border-color:var(--color-destructive);color:var(--color-destructive-fg)}
+.btn.bad.solid{background:var(--color-destructive);border-color:var(--color-destructive);color:#fff}
+.btn.bad.solid:hover:not(:disabled){background:color-mix(in srgb,var(--color-destructive) 88%,var(--color-foreground));color:#fff}
 .btn.small{min-height:36px;padding:6px 12px;font-size:13.5px}
 .btn.ghost{border-color:transparent;background:transparent;box-shadow:none}
 .btn.ghost:hover:not(:disabled){background:var(--color-muted);border-color:transparent}
