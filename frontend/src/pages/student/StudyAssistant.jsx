@@ -23,6 +23,33 @@ function AiChip({ children = 'Study assistant' }) {
   )
 }
 
+const SECTION_RE = /^(practice question|question|good answer|model answer|answer outline)\s*:?$/i
+
+/** Render assistant text with clear section labels and line breaks. */
+function StudyMessageBody({ text }) {
+  const lines = String(text || '').split('\n')
+  return (
+    <div className="msg-body">
+      {lines.map((line, i) => {
+        const trimmed = line.trim()
+        if (!trimmed) return <div key={i} className="msg-gap" />
+        if (SECTION_RE.test(trimmed)) {
+          return (
+            <div key={i} className="msg-h">
+              {trimmed.replace(/:$/, '')}
+            </div>
+          )
+        }
+        return (
+          <p key={i} className="msg-line">
+            {line}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
+
 export default function StudyAssistant() {
   const [searchParams, setSearchParams] = useSearchParams()
   const docParam = searchParams.get('doc') || ''
@@ -202,7 +229,7 @@ export default function StudyAssistant() {
                     <AiChip />
                   </div>
                 ) : null}
-                {m.t}
+                {m.r === 'a' ? <StudyMessageBody text={m.t} /> : m.t}
                 {(m.sources || []).map((s, i) => (
                   <span className="src" key={i}>
                     {s}
@@ -212,9 +239,14 @@ export default function StudyAssistant() {
             ))}
             {typing ? (
               <div className="msg a old typing" aria-label="Assistant is typing">
-                <i />
-                <i />
-                <i />
+                <div style={{ marginBottom: 6 }}>
+                  <AiChip />
+                </div>
+                <span className="typing-dots" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
               </div>
             ) : null}
           </div>

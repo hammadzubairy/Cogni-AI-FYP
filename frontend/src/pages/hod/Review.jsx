@@ -219,7 +219,7 @@ export default function Review() {
       />
 
       {!pending && exam.hod_comment ? (
-        <div className={`callout ${exam.status === 'returned' ? 'red' : 'green'}`}>
+        <div className={`callout ${exam.status === 'returned' ? 'red' : ''}`}>
           <Icon name={exam.status === 'returned' ? 'alert' : 'check'} />
           <div>
             <b>Your comment:</b> {exam.hod_comment}

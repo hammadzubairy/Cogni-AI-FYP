@@ -11,7 +11,8 @@
     "test:e2e": "playwright test",
     "test:e2e:fresh": "playwright test -c playwright.fresh.config.js",
     "test:e2e:ui": "playwright test --ui",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:proof-post": "playwright test -c playwright.proof-post.config.js"
   },
   "dependencies": {
     "react": "^19.2.8",

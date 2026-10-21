@@ -11,10 +11,12 @@
   --color-foreground:#111113; --color-muted-foreground:#5A5954;
   --color-border:#E4E2DA; --color-input:#C4C1B6;
   --color-primary:#F5CF5B; --color-on-primary:#111113; --color-primary-muted:rgba(245,207,91,.28); --color-ring:#7A5A00;
-  --color-ai:#6B4FBB; --color-ai-muted:rgba(107,79,187,.09);
+  --color-ai:#8A6A10; --color-ai-muted:rgba(245,207,91,.18);
   --color-accent:#9A4A00; --color-accent-muted:rgba(255,160,90,.16);
   --color-success:#276B43; --color-success-muted:rgba(46,125,79,.10); --color-success-strong:#2F7A4A;
   --color-destructive:#B3361F; --color-destructive-muted:rgba(179,54,31,.08); --color-destructive-strong:#C2412D;
+  /* Portal role labels — warm family around the sun accent */
+  --role-admin:#9B1C2C; --role-hod:#C45A12; --role-teacher:#7A5A00; --role-student:#7A5A00;
   --hero-glow:radial-gradient(45% 60% at 30% 20%,rgba(245,207,91,.45),transparent 70%),radial-gradient(40% 50% at 75% 15%,rgba(255,160,90,.22),transparent 70%);
   --space-xs:4px; --space-sm:8px; --space-md:16px; --space-lg:24px; --space-xl:32px; --space-2xl:48px; --space-3xl:64px; --space-4xl:96px;
   --radius-sm:10px; --radius:16px; --radius-lg:22px; --radius-pill:999px;
@@ -35,10 +37,11 @@
   --color-foreground:#F2F1EC; --color-muted-foreground:#A9A8A2;
   --color-border:#232329; --color-input:#3A3A42;
   --color-primary:#F5CF5B; --color-on-primary:#0B0B0D; --color-primary-muted:rgba(245,207,91,.12); --color-ring:#F5CF5B;
-  --color-ai:#C4B5FD; --color-ai-muted:rgba(196,181,253,.10);
+  --color-ai:#F5CF5B; --color-ai-muted:rgba(245,207,91,.12);
   --color-accent:#FFA564; --color-accent-muted:rgba(255,165,100,.10);
   --color-success:#86D6A6; --color-success-muted:rgba(134,214,166,.10);
   --color-destructive:#FF9A8B; --color-destructive-muted:rgba(255,154,139,.10);
+  --role-admin:#E85A4C; --role-hod:#FF8A4A; --role-teacher:#F5CF5B; --role-student:#F5CF5B;
   --hero-glow:radial-gradient(45% 60% at 30% 20%,rgba(245,207,91,.20),transparent 70%),radial-gradient(40% 50% at 75% 15%,rgba(255,140,60,.14),transparent 70%);
   --shadow-sm:0 1px 2px rgba(0,0,0,.4);
   --shadow-md:0 2px 10px -2px rgba(0,0,0,.5);
