@@ -38,7 +38,9 @@ async def upload_material(
         return await material_service.upload_text_material(
             teacher, class_id, name=name, text=text
         )
-    raise HTTPException(status_code=400, detail="Send a PDF file or JSON {name, text}.")
+    raise HTTPException(
+        status_code=400, detail="Send a PDF/DOCX/PPTX file or JSON {name, text}."
+    )
 
 
 @router.get("/api/classes/{class_id}/materials", response_model=list[MaterialSummaryOut])

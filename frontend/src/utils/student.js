@@ -72,6 +72,8 @@ export function formatSubmittedAt(value) {
 
 export function materialKindLabel(kind) {
   if (kind === 'pdf') return 'PDF'
+  if (kind === 'docx') return 'DOCX'
+  if (kind === 'pptx') return 'PPTX'
   if (kind === 'text') return 'Notes'
   return kind || 'File'
 }

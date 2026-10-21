@@ -16,7 +16,7 @@ const SUGGESTIONS = [
 
 function AiChip({ children = 'Study assistant' }) {
   return (
-    <span className="chip-ai">
+    <span className="chip-study">
       <Icon name="spark" />
       {children}
     </span>

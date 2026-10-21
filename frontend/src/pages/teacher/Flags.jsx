@@ -114,18 +114,21 @@ export default function Flags() {
       </div>
 
       <div className="filters">
-        <select
-          aria-label="Filter by exam"
-          value={examFilter}
-          onChange={(e) => setExamFilter(e.target.value)}
-        >
-          <option value="">All exams</option>
-          {examOptions.map((x) => (
-            <option key={x.id} value={x.id}>
-              {x.title}
-            </option>
-          ))}
-        </select>
+        <label className="select-wrap">
+          <span className="sr-only">Filter by exam</span>
+          <select
+            aria-label="Filter by exam"
+            value={examFilter}
+            onChange={(e) => setExamFilter(e.target.value)}
+          >
+            <option value="">All exams</option>
+            {examOptions.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.title}
+              </option>
+            ))}
+          </select>
+        </label>
         <span className="small">
           {list.length} awaiting review · 0 decided
         </span>

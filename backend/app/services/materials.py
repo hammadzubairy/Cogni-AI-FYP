@@ -7,10 +7,9 @@ from app.core.db import get_db, oid, to_out
 from app.core.deps import CurrentUser
 from app.services import settings as settings_service
 from app.services.chunker import chunk_pages
+from app.services.documents import extract_pages
 from app.services.notify import log_activity, notify
-from app.services.pdf import extract_pdf_pages
 
-PDF_MAGIC = b"%PDF"
 MIN_PASTED_CHARS = 300
 
 
@@ -88,6 +87,7 @@ async def _insert_material(
 async def upload_pdf_material(
     actor: CurrentUser, class_id: str, *, filename: str, data: bytes
 ) -> dict:
+    """Upload PDF / DOCX / PPTX. Name kept for API compatibility."""
     cls = await _get_class_or_404(class_id)
     _assert_teacher_owns(actor, cls)
 
@@ -97,13 +97,11 @@ async def upload_pdf_material(
             status_code=400,
             detail=f"File is larger than the {max_bytes // (1024 * 1024)} MB limit.",
         )
-    if not data.startswith(PDF_MAGIC):
-        raise HTTPException(status_code=400, detail="Only PDF files are supported.")
 
-    pages = extract_pdf_pages(data)
+    kind, pages = await extract_pages(filename, data)
     chunks = chunk_pages(pages)
     text = "\n\n".join(p["text"] for p in pages)
-    return await _insert_material(actor, cls, name=filename, kind="pdf", text=text, chunks=chunks)
+    return await _insert_material(actor, cls, name=filename, kind=kind, text=text, chunks=chunks)
 
 
 async def upload_text_material(actor: CurrentUser, class_id: str, *, name: str, text: str) -> dict:

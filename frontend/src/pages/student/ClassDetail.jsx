@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import * as api from '../../api'
+import { ApiError } from '../../api/client'
 import { ShellError, ShellLoading } from '../../components/AppShell'
 import EmptyState from '../../components/EmptyState'
+import { useModal } from '../../components/Modal'
 import { useToast } from '../../components/Toast'
 import {
   attemptPercent,
@@ -13,6 +15,87 @@ import {
 } from '../../utils/student'
 import Exams from './Exams'
 import Results from './Results'
+
+function StudentMaterials({ materials }) {
+  const toast = useToast()
+  const { openModal, closeModal } = useModal()
+  const [openingId, setOpeningId] = useState(null)
+
+  async function openDoc(m) {
+    setOpeningId(m.id)
+    try {
+      const doc = await api.getMaterial(m.id)
+      const text = (doc?.text || '').trim()
+      openModal(
+        <>
+          <h3>{doc?.name || m.name}</h3>
+          <p className="small" style={{ marginTop: -4 }}>
+            {materialKindLabel(doc?.kind || m.kind)}
+            {doc?.chunks?.length ? ` · ${doc.chunks.length} sections` : ''}
+          </p>
+          {text ? (
+            <div className="doc-view" tabIndex={0}>
+              {text}
+            </div>
+          ) : (
+            <EmptyState panel={false}>No text extracted for this file yet.</EmptyState>
+          )}
+          <div className="acts">
+            <button type="button" className="btn" onClick={closeModal}>
+              Close
+            </button>
+            <Link
+              className="btn primary"
+              to={`/app/student/study?doc=${encodeURIComponent(m.id)}`}
+              onClick={closeModal}
+            >
+              Ask the assistant
+            </Link>
+          </div>
+        </>,
+      )
+    } catch (err) {
+      toast(err instanceof ApiError ? err.message : 'Could not open this document.', {
+        type: 'error',
+      })
+    } finally {
+      setOpeningId(null)
+    }
+  }
+
+  if (!materials.length) {
+    return <EmptyState>No material yet</EmptyState>
+  }
+
+  return (
+    <div className="panel">
+      {materials.map((m) => (
+        <div className="lrow" key={m.id}>
+          <div className="grow">
+            <b>{m.name}</b>
+            <div className="small">
+              {materialKindLabel(m.kind)}
+              {m.created_at
+                ? ` · added ${formatSubmittedAt(m.created_at).split(',')[0] || ''}`
+                : ''}
+            </div>
+          </div>
+          <button
+            type="button"
+            className={`btn small${openingId === m.id ? ' busy' : ''}`}
+            disabled={openingId === m.id}
+            onClick={() => openDoc(m)}
+          >
+            Open
+          </button>
+          <Link className="btn small" to={`/app/student/study?doc=${encodeURIComponent(m.id)}`}>
+            Ask the assistant
+          </Link>
+        </div>
+      ))}
+    </div>
+  )
+}
 
 const TABS = [
   ['overview', 'Overview'],
@@ -210,30 +293,7 @@ export default function ClassDetail() {
   } else if (tab === 'results') {
     body = <Results classId={id} />
   } else if (tab === 'material') {
-    body = (
-      <div className="panel">
-        {materials.length ? (
-          materials.map((m) => (
-            <div className="lrow" key={m.id}>
-              <div className="grow">
-                <b>{m.name}</b>
-                <div className="small">
-                  {materialKindLabel(m.kind)}
-                  {m.created_at
-                    ? ` · added ${formatSubmittedAt(m.created_at).split(',')[0] || ''}`
-                    : ''}
-                </div>
-              </div>
-              <Link className="btn small" to={`/app/student/study?doc=${encodeURIComponent(m.id)}`}>
-                Ask the assistant
-              </Link>
-            </div>
-          ))
-        ) : (
-          <EmptyState panel={false}>No material yet</EmptyState>
-        )}
-      </div>
-    )
+    body = <StudentMaterials materials={materials} />
   }
 
   return (

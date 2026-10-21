@@ -83,14 +83,23 @@ export const GENERATE_PIPE_STEPS = [
 ]
 
 export const SCANNED_PDF_MESSAGE =
-  'This PDF looks like scanned images. OCR is not supported yet. Paste the text instead.'
+  'Could not read enough text from this file. Try a clearer scan, another format, or paste the notes.'
 
 export const MIN_PASTE_CHARS = 300
 
+export const MATERIAL_ACCEPT =
+  '.pdf,.docx,.pptx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.presentationml.presentation'
+
 export function kindLabel(kind) {
   if (kind === 'pdf') return 'PDF'
+  if (kind === 'docx') return 'DOCX'
+  if (kind === 'pptx') return 'PPTX'
   if (kind === 'text') return 'Notes'
   return kind || '—'
+}
+
+export function isMaterialFile(name) {
+  return /\.(pdf|docx|pptx)$/i.test(name || '')
 }
 
 /** Match backend `needs_approval` / v7 `needsApproval`. Default policy is seed `major`. */

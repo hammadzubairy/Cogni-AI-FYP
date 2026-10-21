@@ -24,6 +24,17 @@ export function ModalProvider({ children }) {
   const onCloseRef = useRef(null)
   const open = content != null || closing
 
+  const contentRef = useRef(null)
+  const closingRef = useRef(false)
+
+  useEffect(() => {
+    contentRef.current = content
+  }, [content])
+
+  useEffect(() => {
+    closingRef.current = closing
+  }, [closing])
+
   const finishClose = useCallback(() => {
     const cb = onCloseRef.current
     onCloseRef.current = null
@@ -36,11 +47,13 @@ export function ModalProvider({ children }) {
   }, [])
 
   const closeModal = useCallback(() => {
-    if (content == null && !closing) return
+    // Use refs so callers that captured closeModal at open-time still work
+    // (fixes indefinite Create-class spinner after a successful create).
+    if (contentRef.current == null && !closingRef.current) return
     setClosing(true)
     clearTimeout(closeTimer.current)
     closeTimer.current = setTimeout(finishClose, 150)
-  }, [content, closing, finishClose])
+  }, [finishClose])
 
   const openModal = useCallback((node, options = {}) => {
     clearTimeout(closeTimer.current)

@@ -1,4 +1,8 @@
-"""Extract clean, page-tagged text from PDF bytes."""
+"""Extract clean, page-tagged text from PDF bytes.
+
+Prefer `documents.extract_pages` for uploads (OCR + DOCX/PPTX). This module
+keeps the synchronous text-layer path used by tests and older call sites.
+"""
 
 import io
 import re
@@ -26,7 +30,11 @@ def _normalize_whitespace(text: str) -> str:
 def extract_pdf_pages(data: bytes) -> list[dict]:
     """Return [{page, text}], one entry per PDF page: whitespace-normalised,
     hyphenated line breaks joined, and lines repeated on more than half the
-    pages (headers/footers) dropped."""
+    pages (headers/footers) dropped.
+
+    Note: scanned PDFs with little extractable text raise SCANNED_PDF. Upload
+    routes should use documents.extract_pages which runs OCR instead.
+    """
     try:
         reader = PdfReader(io.BytesIO(data))
         raw_pages = [page.extract_text() or "" for page in reader.pages]
@@ -58,8 +66,8 @@ def extract_pdf_pages(data: bytes) -> list[dict]:
             status_code=400,
             detail={
                 "detail": (
-                    "This PDF looks like scanned images. OCR is not supported yet. "
-                    "Paste the text instead."
+                    "This PDF looks like scanned images. OCR will be attempted "
+                    "on upload; if that fails, paste the text instead."
                 ),
                 "code": "SCANNED_PDF",
             },

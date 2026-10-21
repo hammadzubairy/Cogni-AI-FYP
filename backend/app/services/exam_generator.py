@@ -14,21 +14,32 @@ MARKS_BY_TYPE = {"MCQ": 2, "Short": 5, "Essay": 10}
 BLOOM_LEVELS = {"Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"}
 HIGHER_ORDER_BLOOMS = {"Analyze", "Evaluate", "Create"}
 MAX_TOTAL_QUESTIONS = 40
-LONG_MATERIAL_WORDS = 6000
+LONG_MATERIAL_WORDS = 3500
+MAX_SOURCE_CHUNKS = 10
+MAX_CHUNK_CHARS = 1200
 DUPLICATE_JACCARD_THRESHOLD = 0.8
 
 
 def select_source_chunks(chunks: list[dict]) -> list[dict]:
-    """Pick chunks spread evenly across the document when it's longer than
-    ~6000 words, keeping each chunk's original idx intact."""
+    """Pick a capped, evenly spaced subset of chunks so generation stays
+    within free-tier context limits. Truncate very long chunks."""
+    if not chunks:
+        return []
+
+    def _trim(c: dict) -> dict:
+        text = c.get("text") or ""
+        if len(text) > MAX_CHUNK_CHARS:
+            text = text[:MAX_CHUNK_CHARS].rsplit(" ", 1)[0] + "…"
+        return {**c, "text": text}
+
     total_words = sum(len(c["text"].split()) for c in chunks)
-    if total_words <= LONG_MATERIAL_WORDS or len(chunks) <= 8:
-        return chunks
-    target = max(8, len(chunks) // 3)
+    if total_words <= LONG_MATERIAL_WORDS and len(chunks) <= MAX_SOURCE_CHUNKS:
+        return [_trim(c) for c in chunks]
+    target = min(MAX_SOURCE_CHUNKS, max(6, len(chunks) // 4))
     target = min(target, len(chunks))
     step = len(chunks) / target
     picked = sorted({min(round(i * step), len(chunks) - 1) for i in range(target)})
-    return [chunks[i] for i in picked]
+    return [_trim(chunks[i]) for i in picked]
 
 
 def _normalized_tokens(text: str) -> set[str]:

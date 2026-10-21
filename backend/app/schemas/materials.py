@@ -8,7 +8,7 @@ from app.schemas.common import OutBase
 
 class MaterialChunk(BaseModel):
     idx: int
-    page: str | None = None
+    page: int | str | None = None
     heading: str | None = None
     text: str
 
@@ -17,7 +17,7 @@ class MaterialOut(OutBase):
     class_id: str
     owner_id: str | None = None
     name: str
-    kind: Literal["pdf", "text"]
+    kind: Literal["pdf", "docx", "pptx", "text"]
     text: str
     chunks: list[MaterialChunk] = Field(default_factory=list)
     created_at: datetime
@@ -27,7 +27,7 @@ class MaterialSummaryOut(OutBase):
     class_id: str
     owner_id: str | None = None
     name: str
-    kind: Literal["pdf", "text"]
+    kind: Literal["pdf", "docx", "pptx", "text"]
     chunk_count: int
     word_count: int
     created_at: datetime

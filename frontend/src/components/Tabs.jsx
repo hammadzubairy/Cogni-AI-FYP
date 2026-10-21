@@ -14,7 +14,9 @@ export default function Tabs({ items = [], value, onChange, 'aria-label': ariaLa
             onClick={() => onChange?.(id)}
           >
             {item.label}
-            {item.count != null ? <span className="small">{item.count}</span> : null}
+            {item.count != null ? (
+              <span className="small tab-count"> {item.count}</span>
+            ) : null}
           </button>
         )
       })}

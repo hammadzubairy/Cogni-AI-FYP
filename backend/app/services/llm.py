@@ -58,6 +58,29 @@ class LLMClient:
         raise NotImplementedError
 
 
+def _friendly_llm_error(exc: BaseException) -> str:
+    """Turn provider noise into a short message teachers/students can act on."""
+    raw = str(exc).strip() or "The AI request failed."
+    lower = raw.lower()
+    if "413" in raw or "too large" in lower or "request too large" in lower or "context length" in lower:
+        return (
+            "The source material is too large for one pass. "
+            "Try fewer files, a shorter PDF, or select less material and retry."
+        )
+    if "429" in raw or "rate limit" in lower or "rate_limit" in lower:
+        return "The AI service is busy right now. Wait a moment and press Retry."
+    if "401" in raw or "403" in raw or "invalid api key" in lower or "unauthorized" in lower:
+        return "The AI service is not configured correctly. Ask an admin to check the API key."
+    if "timeout" in lower or "timed out" in lower:
+        return "The AI took too long to respond. Press Retry — shorter material usually helps."
+    # Strip nested JSON blobs that confuse users
+    if "{'error'" in raw or '{"error"' in raw or "error code:" in lower:
+        return "The AI could not finish this request. Press Retry, or use a smaller document."
+    if len(raw) > 180:
+        return raw[:180].rsplit(" ", 1)[0] + "…"
+    return raw
+
+
 class OpenAIClient(LLMClient):
     def __init__(self) -> None:
         from openai import AsyncOpenAI
@@ -65,6 +88,12 @@ class OpenAIClient(LLMClient):
         kwargs: dict = {"api_key": settings.LLM_API_KEY}
         if settings.LLM_BASE_URL:
             kwargs["base_url"] = settings.LLM_BASE_URL
+        # OpenRouter ranks apps that send these optional headers.
+        if "openrouter.ai" in (settings.LLM_BASE_URL or ""):
+            kwargs["default_headers"] = {
+                "HTTP-Referer": settings.PUBLIC_BASE_URL or "https://cogni.ai",
+                "X-Title": "Cogni.ai",
+            }
         self._client = AsyncOpenAI(**kwargs)
 
     async def json_complete(
@@ -82,16 +111,13 @@ class OpenAIClient(LLMClient):
                     temperature=temperature,
                     response_format={"type": "json_object"},
                 ),
-                timeout=60,
+                timeout=120,
             )
         except TimeoutError as exc:
-            raise LLMRequestError("The LLM request timed out.") from exc
+            raise LLMRequestError("The AI took too long to respond. Press Retry.") from exc
         except Exception as exc:
-            detail = str(exc).strip() or "The LLM request failed."
-            # Keep message short for the API client; full error stays in logs.
-            if len(detail) > 240:
-                detail = detail[:240] + "…"
-            log_event(logger, "llm_provider_error", provider="openai", error=detail)
+            detail = _friendly_llm_error(exc)
+            log_event(logger, "llm_provider_error", provider="openai", error=str(exc)[:500])
             raise LLMRequestError(detail) from exc
         content = response.choices[0].message.content or ""
         usage = getattr(response, "usage", None)
@@ -104,6 +130,42 @@ class OpenAIClient(LLMClient):
                 completion_tokens=getattr(usage, "completion_tokens", None),
             )
         return _extract_json(content)
+
+    async def vision_text(
+        self,
+        prompt: str,
+        images_b64: list[str],
+        *,
+        max_tokens: int = 4000,
+        model: str | None = None,
+    ) -> str:
+        """OCR / multimodal: send page images + prompt, return plain text."""
+        model_id = model or settings.LLM_OCR_MODEL or settings.LLM_MODEL
+        content: list[dict] = [{"type": "text", "text": prompt}]
+        for b64 in images_b64:
+            content.append(
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/png;base64,{b64}"},
+                }
+            )
+        try:
+            response = await asyncio.wait_for(
+                self._client.chat.completions.create(
+                    model=model_id,
+                    messages=[{"role": "user", "content": content}],
+                    max_tokens=max_tokens,
+                    temperature=0.1,
+                ),
+                timeout=180,
+            )
+        except TimeoutError as exc:
+            raise LLMRequestError("OCR timed out. Try a shorter PDF.") from exc
+        except Exception as exc:
+            detail = _friendly_llm_error(exc)
+            log_event(logger, "llm_ocr_error", provider="openai", error=str(exc)[:500])
+            raise LLMRequestError(detail) from exc
+        return (response.choices[0].message.content or "").strip()
 
 
 class AnthropicClient(LLMClient):
@@ -380,8 +442,8 @@ def get_llm_client() -> LLMClient:
     provider = (settings.LLM_PROVIDER or "").strip().lower()
     if provider == "mock":
         return MockLLM()
-    # Groq is OpenAI-compatible — set LLM_BASE_URL=https://api.groq.com/openai/v1
-    if provider in ("openai", "groq"):
+    # OpenRouter / Groq / any OpenAI-compatible endpoint via LLM_BASE_URL
+    if provider in ("openai", "groq", "openrouter"):
         return OpenAIClient()
     if provider == "anthropic":
         return AnthropicClient()

@@ -138,16 +138,16 @@ export default function Dashboard() {
           <div className="panel-h">
             <h3>Getting started</h3>
             {onboarding.complete ? (
-              <span className="pill p-good">Complete</span>
+              <span className="status-mark good">Complete</span>
             ) : (
-              <span className="pill p-warn">In progress</span>
+              <span className="status-mark warn">In progress</span>
             )}
           </div>
           <div className="panel-b">
             {onboarding.items.map((item) => (
               <div className="lrow" key={item.key}>
-                <span className={`pill ${item.done ? 'p-good' : 'p-grey'}`}>
-                  {item.done ? 'Done' : 'To do'}
+                <span className={`status-mark ${item.done ? 'good' : 'todo'}`}>
+                  {item.done ? '✓ Done' : 'To do'}
                 </span>
                 <div className="grow">
                   <b>{item.label}</b>
