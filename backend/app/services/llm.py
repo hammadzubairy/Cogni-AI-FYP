@@ -226,7 +226,19 @@ class MockLLM(LLMClient):
             return self._grade(payload)
         if mode == "ask":
             return self._ask(payload)
+        if mode == "quality_filter":
+            return self._quality_filter(payload)
         return self._generate(payload)
+
+    def _quality_filter(self, payload: dict) -> dict:
+        """Accept every question — mock generation already emits valid stems."""
+        questions = payload.get("questions") or []
+        return {
+            "results": [
+                {"index": int(q.get("index", i)), "pass": True, "reason": ""}
+                for i, q in enumerate(questions)
+            ]
+        }
 
     def _generate(self, payload: dict) -> dict:
         chunks = payload.get("chunks") or [

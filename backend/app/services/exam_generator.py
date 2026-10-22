@@ -8,7 +8,11 @@ from app.prompts.exam_generation import (
     EXAM_GEN_SYSTEM_PROMPT,
     build_exam_gen_user_prompt,
 )
-from app.services.llm import LLMClient, call_json
+from app.prompts.quality_filter import (
+    QUALITY_FILTER_SYSTEM_PROMPT,
+    build_quality_filter_user_prompt,
+)
+from app.services.llm import LLMClient, LLMError, call_json
 
 MARKS_BY_TYPE = {"MCQ": 2, "Short": 5, "Essay": 10}
 BLOOM_LEVELS = {"Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"}
@@ -157,6 +161,48 @@ async def _call_llm_for_questions(
     return questions, warnings
 
 
+async def filter_questions_quality(
+    llm: LLMClient, questions: list[dict]
+) -> tuple[list[dict], list[str]]:
+    """Second LLM pass: drop questions that fail relevance/grammar/Bloom/dupe checks.
+    On LLM failure, keep the batch (schema validation already ran)."""
+    if not questions:
+        return [], []
+    warnings: list[str] = []
+    try:
+        data = await call_json(
+            llm,
+            QUALITY_FILTER_SYSTEM_PROMPT,
+            build_quality_filter_user_prompt(questions),
+            max_tokens=2000,
+            temperature=0.1,
+        )
+    except LLMError:
+        warnings.append("Quality filter unavailable; kept schema-valid questions.")
+        return questions, warnings
+
+    results = data.get("results") if isinstance(data, dict) else None
+    if not isinstance(results, list):
+        warnings.append("Quality filter returned no results; kept questions.")
+        return questions, warnings
+
+    rejected: set[int] = set()
+    for row in results:
+        if not isinstance(row, dict):
+            continue
+        idx = row.get("index")
+        if not isinstance(idx, int) or isinstance(idx, bool):
+            continue
+        if 0 <= idx < len(questions) and row.get("pass") is False:
+            rejected.add(idx)
+            reason = str(row.get("reason") or "failed quality checks").strip()
+            stem = questions[idx].get("text", "")[:60]
+            warnings.append(f'Quality filter dropped "{stem}": {reason}')
+
+    kept = [q for i, q in enumerate(questions) if i not in rejected]
+    return kept, warnings
+
+
 async def generate_questions(
     llm: LLMClient,
     chunks: list[dict],
@@ -165,7 +211,7 @@ async def generate_questions(
     *,
     existing_exam_questions: list[list[dict]] | None = None,
 ) -> tuple[list[dict], list[str]]:
-    """Generate, validate, deduplicate and top up a full set of questions."""
+    """Generate, validate, quality-filter, deduplicate and top up questions."""
     total_requested = sum(counts.values())
     if total_requested > MAX_TOTAL_QUESTIONS:
         raise ValueError(f"Cannot request more than {MAX_TOTAL_QUESTIONS} questions.")
@@ -178,6 +224,9 @@ async def generate_questions(
         if not _is_duplicate(q, deduped):
             deduped.append(q)
     questions = deduped
+
+    questions, qa_warnings = await filter_questions_quality(llm, questions)
+    warnings.extend(qa_warnings)
 
     for prior_questions in existing_exam_questions or []:
         for q in questions:
@@ -197,6 +246,8 @@ async def generate_questions(
             llm, source_chunks, shortfall, clos, avoid_texts=[q["text"] for q in questions]
         )
         warnings.extend(retry_warnings)
+        retry_questions, retry_qa = await filter_questions_quality(llm, retry_questions)
+        warnings.extend(retry_qa)
         for q in retry_questions:
             if q["type"] not in shortfall:
                 continue
@@ -246,6 +297,7 @@ async def regenerate_one(
         preferred_topic=preferred_topic,
         preferred_clo=preferred_clo,
     )
+    questions, _qa = await filter_questions_quality(llm, questions)
     for q in questions:
         if q["type"] == qtype and not _is_duplicate(q, existing_questions):
             return q

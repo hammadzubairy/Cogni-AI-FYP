@@ -57,7 +57,9 @@ def _publish_quiz(client, *, class_id, material_id, title, duration_min=30):
 
 def _good_written_answer(question: dict) -> str:
     words = [v for k in question["keywords"] for v in k["variants"]]
-    return "In my own words: " + " ".join(words) + "."
+    model = (question.get("model_answer") or "").strip()
+    # Include model wording so embedding similarity (FR-18) also scores high.
+    return "In my own words: " + " ".join(words) + ". " + model
 
 
 async def _set_started_at(attempt_id: str, when: datetime) -> None:
@@ -122,7 +124,8 @@ def test_full_grade_override_release_feedback_flow(client):
     assert results["aggregate"]["enrolled_count"] == 6
     row = results["attempts"][0]
     assert row["student_id"] and row["max"] == mcq["marks"] + short["marks"]
-    assert row["total"] == row["max"]  # correct MCQ + full keyword coverage from mock grader
+    # Correct MCQ + strong written (keywords + embedding + LLM rubric blend).
+    assert row["total"] == row["max"]
 
     detail = client.get(f"/api/attempts/{attempt_id}/detail", headers=_auth(client, TEACHER_A)).json()
     assert detail["ai_detector"] == "heuristic"
@@ -318,9 +321,12 @@ async def test_llm_score_and_labels_are_clamped_and_validated():
         }
     )
     detector = grading_service.HeuristicDetector()
-    result = await grading_service._grade_written_llm(llm, question, "a real answer", detector)
-    assert result["score"] == 5.0  # clamped to max_marks
-    assert result["similarity"] == 100  # clamped to 0..100
+    # Answer overlaps model_answer so embedding similarity is high; keyword "a" hits.
+    result = await grading_service._grade_written_llm(
+        llm, question, "a answer covering M thoroughly", detector
+    )
+    assert result["score"] == 5.0  # LLM score clamped; blend still full marks
+    assert 0 <= result["similarity"] <= 100  # embedding similarity, not LLM's 150
     assert result["key_points_hit"] == ["A"]  # labels not in the question are dropped
     assert result["key_points_missed"] == []
     assert result["fallback"] is False

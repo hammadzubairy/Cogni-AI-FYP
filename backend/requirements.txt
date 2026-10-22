@@ -14,6 +14,9 @@ httpx
 openai
 anthropic
 python-dotenv
+trafilatura
+spacy
+sentence-transformers
 ruff
 pytest
 pytest-asyncio

@@ -9,6 +9,8 @@ from app.services import settings as settings_service
 from app.services.chunker import chunk_pages
 from app.services.documents import extract_pages
 from app.services.notify import log_activity, notify
+from app.services.nlp import preprocess_pages
+from app.services.url_fetch import fetch_url_text
 
 MIN_PASTED_CHARS = 300
 
@@ -99,6 +101,7 @@ async def upload_pdf_material(
         )
 
     kind, pages = await extract_pages(filename, data)
+    pages = preprocess_pages(pages)
     chunks = chunk_pages(pages)
     text = "\n\n".join(p["text"] for p in pages)
     return await _insert_material(actor, cls, name=filename, kind=kind, text=text, chunks=chunks)
@@ -114,8 +117,24 @@ async def upload_text_material(actor: CurrentUser, class_id: str, *, name: str, 
             status_code=400,
             detail=f"Pasted text must be at least {MIN_PASTED_CHARS} characters.",
         )
-    chunks = chunk_pages([{"page": None, "text": text}])
+    pages = preprocess_pages([{"page": None, "text": text}])
+    chunks = chunk_pages(pages)
+    text = "\n\n".join(p["text"] for p in pages)
     return await _insert_material(actor, cls, name=name, kind="text", text=text, chunks=chunks)
+
+
+async def upload_url_material(actor: CurrentUser, class_id: str, *, url: str, name: str | None = None) -> dict:
+    cls = await _get_class_or_404(class_id)
+    _assert_teacher_owns(actor, cls)
+
+    title, text = fetch_url_text(url)
+    display_name = (name or "").strip() or title
+    pages = preprocess_pages([{"page": None, "text": text}])
+    chunks = chunk_pages(pages)
+    text = "\n\n".join(p["text"] for p in pages)
+    return await _insert_material(
+        actor, cls, name=display_name, kind="url", text=text, chunks=chunks
+    )
 
 
 async def list_materials(user: CurrentUser, class_id: str) -> list[dict]:

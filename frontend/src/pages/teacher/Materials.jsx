@@ -40,6 +40,8 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
   const [files, setFiles] = useState([])
   const [notes, setNotes] = useState('')
   const [notesName, setNotesName] = useState('')
+  const [pageUrl, setPageUrl] = useState('')
+  const [urlName, setUrlName] = useState('')
   const [fieldError, setFieldError] = useState('')
   const [scannedCallout, setScannedCallout] = useState(false)
   const [pipePromise, setPipePromise] = useState(null)
@@ -179,6 +181,22 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
       return
     }
 
+    if (tab === 'url') {
+      const u = pageUrl.trim()
+      if (!/^https?:\/\//i.test(u)) {
+        setFieldError('Enter a full web address starting with https://')
+        return
+      }
+      setBusy(true)
+      setPipePromise(
+        api.uploadMaterialUrl(activeClassId, {
+          url: u,
+          name: urlName.trim() || undefined,
+        }),
+      )
+      return
+    }
+
     if (pasteChars < MIN_PASTE_CHARS) {
       setFieldError(`Pasted text must be at least ${MIN_PASTE_CHARS} characters.`)
       return
@@ -196,6 +214,8 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
     setFiles([])
     setNotes('')
     setNotesName('')
+    setPageUrl('')
+    setUrlName('')
     setUploadProgress('')
     if (fileRef.current) fileRef.current.value = ''
     try {
@@ -299,6 +319,7 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
             items={[
               { id: 'pdf', label: 'Files' },
               { id: 'text', label: 'Paste notes' },
+              { id: 'url', label: 'Web link' },
             ]}
           />
 
@@ -388,7 +409,9 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
                 </p>
               ) : null}
             </>
-          ) : (
+          ) : null}
+
+          {tab === 'text' ? (
             <>
               <Field id="mat-name" label="Name (optional)">
                 <input
@@ -419,7 +442,38 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
                   : ''}
               </p>
             </>
-          )}
+          ) : null}
+
+          {tab === 'url' ? (
+            <>
+              <Field id="mat-url-name" label="Name (optional)">
+                <input
+                  id="mat-url-name"
+                  value={urlName}
+                  disabled={busy}
+                  onChange={(e) => setUrlName(e.target.value)}
+                  placeholder="Lecture article"
+                />
+              </Field>
+              <Field
+                id="mat-url"
+                label="Page URL"
+                error={fieldError && tab === 'url' ? fieldError : ''}
+              >
+                <input
+                  id="mat-url"
+                  type="url"
+                  value={pageUrl}
+                  disabled={busy}
+                  onChange={(e) => {
+                    setPageUrl(e.target.value)
+                    setFieldError('')
+                  }}
+                  placeholder="https://en.wikipedia.org/wiki/Hash_table"
+                />
+              </Field>
+            </>
+          ) : null}
 
           {tab === 'pdf' && fieldError && !scannedCallout ? (
             <p className="ferr" style={{ marginBottom: 12 }}>

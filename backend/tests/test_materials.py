@@ -73,6 +73,16 @@ def test_upload_pasted_text_too_short_is_400(client):
     assert resp.status_code == 400
 
 
+def test_upload_url_localhost_is_400(client):
+    c1_id = _class_id(client, "CS-201-A", TEACHER_A)
+    resp = client.post(
+        f"/api/classes/{c1_id}/materials",
+        json={"url": "http://127.0.0.1/secret"},
+        headers=_auth(client, TEACHER_A),
+    )
+    assert resp.status_code == 400
+
+
 def test_upload_pasted_text_success(client):
     c1_id = _class_id(client, "CS-201-A", TEACHER_A)
     text = "Paragraph about graphs. " * 30

@@ -1,21 +1,31 @@
 """The attempt grading engine: MCQ auto-grading, LLM rubric grading of
-written answers with a keyword-overlap fallback, and AI-writing likelihood
-detection. `finalize_attempt` is the single place an attempt's answers turn
-into results, used both by an explicit student submit and by auto-close of
-an expired/closed attempt."""
+written answers with keyword + embedding similarity signals, and AI-writing
+likelihood detection. `finalize_attempt` is the single place an attempt's
+answers turn into results, used both by an explicit student submit and by
+auto-close of an expired/closed attempt."""
 
 import asyncio
+import logging
 import re
 from datetime import UTC, datetime
 from typing import ClassVar
 
+import httpx
+
 from app.core.config import settings
 from app.core.db import get_db, oid
 from app.prompts.grading import GRADING_SYSTEM_PROMPT, build_grading_user_prompt
+from app.services.embeddings import cosine_similarity_percent
 from app.services.llm import LLMError, call_json, get_llm_client
 
 GRADE_STEP = 0.5
 WRITTEN_GRADING_CONCURRENCY = 4
+# v7 scoregrid weights: semantic similarity / key concepts / LLM rubric
+W_SIM = 0.4
+W_KEYS = 0.2
+W_RUBRIC = 0.4
+
+logger = logging.getLogger("app.grading")
 
 
 class AIDetector:
@@ -52,45 +62,108 @@ class HeuristicDetector(AIDetector):
 
 
 class GPTZeroDetector(AIDetector):
+    """GPTZero HTTP API (free tier). Falls back to HeuristicDetector on any
+    failure so grading never blocks on the external service."""
+
     label = "gptzero"
+    API_URL = "https://api.gptzero.me/v2/predict/text"
+
+    def __init__(self) -> None:
+        self._fallback = HeuristicDetector()
 
     def predict(self, text: str) -> float:
-        raise NotImplementedError("GPTZero integration is not implemented.")
+        txt = (text or "").strip()
+        if not txt:
+            return self._fallback.predict(txt)
+        api_key = (settings.GPTZERO_API_KEY or "").strip()
+        if not api_key:
+            logger.info("GPTZERO_API_KEY unset; using heuristic AI detector.")
+            return self._fallback.predict(txt)
+        try:
+            with httpx.Client(timeout=12.0) as client:
+                resp = client.post(
+                    self.API_URL,
+                    headers={
+                        "x-api-key": api_key,
+                        "Content-Type": "application/json",
+                        "Accept": "application/json",
+                    },
+                    json={"document": txt},
+                )
+            if resp.status_code >= 400:
+                logger.warning("GPTZero HTTP %s; falling back to heuristic.", resp.status_code)
+                return self._fallback.predict(txt)
+            data = resp.json()
+            prob = _gptzero_probability(data)
+            if prob is None:
+                return self._fallback.predict(txt)
+            return float(max(3, min(97, round(prob))))
+        except Exception:
+            logger.exception("GPTZero request failed; falling back to heuristic.")
+            return self._fallback.predict(txt)
+
+
+def _gptzero_probability(data: dict) -> float | None:
+    """Extract a 0-100 AI likelihood from a GPTZero v2 response."""
+    if not isinstance(data, dict):
+        return None
+    docs = data.get("documents")
+    if isinstance(docs, list) and docs:
+        doc = docs[0] if isinstance(docs[0], dict) else {}
+        for key in (
+            "completely_generated_prob",
+            "average_generated_prob",
+            "predicted_prob",
+            "class_probabilities",
+        ):
+            val = doc.get(key)
+            if isinstance(val, dict):
+                # class_probabilities may be {ai: 0.8, human: 0.2}
+                for k in ("ai", "AI", "generated", "fake"):
+                    if isinstance(val.get(k), (int, float)):
+                        p = float(val[k])
+                        return p * 100 if p <= 1 else p
+            if isinstance(val, (int, float)):
+                p = float(val)
+                return p * 100 if p <= 1 else p
+    for key in ("completely_generated_prob", "average_generated_prob", "ai_probability"):
+        val = data.get(key)
+        if isinstance(val, (int, float)):
+            p = float(val)
+            return p * 100 if p <= 1 else p
+    return None
 
 
 def get_ai_detector() -> AIDetector:
-    if settings.AI_DETECTOR == "heuristic":
+    choice = (settings.AI_DETECTOR or "heuristic").strip().lower()
+    if choice == "gptzero":
+        return GPTZeroDetector()
+    if choice == "heuristic":
         return HeuristicDetector()
     raise NotImplementedError(f"AI_DETECTOR={settings.AI_DETECTOR!r} is not implemented.")
 
 
-def _grade_mcq(question: dict, answer) -> dict:
-    marks = question["marks"]
-    correct = question.get("answer_index")
-    ok = answer is not None and answer == correct
-    if answer is None:
-        note = "Not answered"
-    elif ok:
-        note = "Correct"
-    else:
-        note = f"Chose {'ABCD'[answer]}, correct is {'ABCD'[correct]}"
-    return {
-        "score": marks if ok else 0.0,
-        "max": marks,
-        "similarity": None,
-        "key_points_hit": [],
-        "key_points_missed": [],
-        "reason": note,
-        "ai_probability": None,
-        "fallback": False,
-    }
+def _keyword_coverage(question: dict, answer: str) -> tuple[list[str], list[str], float]:
+    text = (answer or "").lower()
+    keywords = question.get("keywords", [])
+    hit, miss = [], []
+    for k in keywords:
+        variants = [v.lower() for v in k.get("variants", [])]
+        (hit if any(v in text for v in variants) else miss).append(k["label"])
+    coverage = len(hit) / len(keywords) if keywords else 0.0
+    return hit, miss, coverage
+
+
+def _blend_score(max_marks: float, sim_pct: int, key_pct: float, rubric_pct: float) -> float:
+    blended = (W_SIM * sim_pct + W_KEYS * key_pct + W_RUBRIC * rubric_pct) / 100
+    raw = max_marks * blended
+    return max(0.0, min(float(max_marks), round(raw / GRADE_STEP) * GRADE_STEP))
 
 
 def _keyword_fallback(question: dict, answer: str) -> dict:
-    """Ported from v7's `gradeWritten()`. Used when the LLM grader fails."""
+    """Used when the LLM grader fails. Still uses embedding similarity (FR-18)."""
     max_marks = question["marks"]
-    text = (answer or "").lower()
-    words = [w for w in text.split() if w]
+    words = [w for w in (answer or "").split() if w]
     keywords = question.get("keywords", [])
     if not words:
         return {
@@ -98,39 +171,52 @@ def _keyword_fallback(question: dict, answer: str) -> dict:
             "key_points_hit": [], "key_points_missed": [k["label"] for k in keywords],
             "reason": "No answer given", "fallback": True,
         }
-    hit, miss = [], []
-    for k in keywords:
-        variants = [v.lower() for v in k.get("variants", [])]
-        (hit if any(v in text for v in variants) else miss).append(k["label"])
-    coverage = len(hit) / len(keywords) if keywords else 0.0
+    hit, miss, coverage = _keyword_coverage(question, answer)
+    model_answer = question.get("model_answer") or ""
+    key_pct = coverage * 100
+    sim_pct = _similarity_signal(answer, model_answer, key_pct)
     len_factor = min(1.0, len(words) / (70 if question["type"] == "Essay" else 25))
-    similarity = round((coverage * 0.8 + len_factor * 0.2) * 100)
-    key_pts = round(coverage * 100)
-    rubric = round(len_factor * 10) if coverage == 0 else min(100, round(coverage * 92 + len_factor * 10))
-    score = round(max_marks * (0.4 * similarity + 0.2 * key_pts + 0.4 * rubric) / 100 * 2) / 2
+    rubric_pct = round(len_factor * 10) if coverage == 0 else min(
+        100, round(coverage * 92 + len_factor * 10)
+    )
+    score = _blend_score(max_marks, sim_pct, key_pct, rubric_pct)
     reason = "Missing: " + "; ".join(miss) if miss else "Covers every key point"
     return {
-        "score": score, "max": max_marks, "similarity": similarity,
+        "score": score, "max": max_marks, "similarity": sim_pct,
         "key_points_hit": hit, "key_points_missed": miss,
         "reason": reason, "fallback": True,
     }
 
 
+def _similarity_signal(answer: str, model_answer: str, key_pct: float) -> int:
+    """Embedding cosine (FR-18), floored by keyword coverage so a sparse
+    model_answer cannot wipe out an otherwise solid keyword match."""
+    emb_sim = cosine_similarity_percent(answer, model_answer)
+    return max(emb_sim, int(round(key_pct)))
+
+
 async def _grade_written_llm(llm, question: dict, answer: str, detector: AIDetector) -> dict:
     max_marks = question["marks"]
     labels = {k["label"] for k in question.get("keywords", [])}
+    model_answer = question.get("model_answer") or ""
+    hit_kw, miss_kw, coverage = _keyword_coverage(question, answer)
+    key_pct = coverage * 100
+    sim_pct = _similarity_signal(answer, model_answer, key_pct)
+
     user_prompt = build_grading_user_prompt(question, answer)
     try:
         data = await call_json(llm, GRADING_SYSTEM_PROMPT, user_prompt, max_tokens=500, temperature=0.2)
-        score = float(data.get("score", 0))
-        score = max(0.0, min(float(max_marks), round(score / GRADE_STEP) * GRADE_STEP))
-        similarity = data.get("similarity")
-        similarity = max(0, min(100, int(similarity))) if isinstance(similarity, (int, float)) else None
+        llm_score = float(data.get("score", 0))
+        llm_score = max(0.0, min(float(max_marks), round(llm_score / GRADE_STEP) * GRADE_STEP))
+        rubric_pct = (llm_score / max_marks) * 100 if max_marks else 0.0
         hit = [label for label in (data.get("key_points_hit") or []) if label in labels]
         missed = [label for label in (data.get("key_points_missed") or []) if label in labels]
+        if not hit and not missed:
+            hit, missed = hit_kw, miss_kw
         reason = str(data.get("reason", ""))[:200]
+        score = _blend_score(max_marks, sim_pct, key_pct, rubric_pct)
         result = {
-            "score": score, "max": max_marks, "similarity": similarity,
+            "score": score, "max": max_marks, "similarity": sim_pct,
             "key_points_hit": hit, "key_points_missed": missed,
             "reason": reason, "fallback": False,
         }
@@ -166,6 +252,28 @@ async def grade_attempt_answers(exam: dict, answers: dict) -> dict:
 
     await asyncio.gather(*(grade_one(q) for q in exam["questions"]))
     return results
+
+
+def _grade_mcq(question: dict, answer) -> dict:
+    marks = question["marks"]
+    correct = question.get("answer_index")
+    ok = answer is not None and answer == correct
+    if answer is None:
+        note = "Not answered"
+    elif ok:
+        note = "Correct"
+    else:
+        note = f"Chose {'ABCD'[answer]}, correct is {'ABCD'[correct]}"
+    return {
+        "score": marks if ok else 0.0,
+        "max": marks,
+        "similarity": None,
+        "key_points_hit": [],
+        "key_points_missed": [],
+        "reason": note,
+        "ai_probability": None,
+        "fallback": False,
+    }
 
 
 async def finalize_attempt(attempt: dict) -> dict:

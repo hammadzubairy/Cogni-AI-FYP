@@ -30,16 +30,22 @@ async def upload_material(
             teacher, class_id, filename=name, data=data
         )
     if content_type.startswith("application/json"):
-        body = await request.json()
-        name = (body or {}).get("name")
-        text = (body or {}).get("text")
+        body = await request.json() or {}
+        url = body.get("url")
+        if url:
+            return await material_service.upload_url_material(
+                teacher, class_id, url=url, name=body.get("name")
+            )
+        name = body.get("name")
+        text = body.get("text")
         if not name or text is None:
-            raise HTTPException(status_code=400, detail="Provide {name, text}.")
+            raise HTTPException(status_code=400, detail="Provide {name, text} or {url}.")
         return await material_service.upload_text_material(
             teacher, class_id, name=name, text=text
         )
     raise HTTPException(
-        status_code=400, detail="Send a PDF/DOCX/PPTX file or JSON {name, text}."
+        status_code=400,
+        detail="Send a PDF/DOCX/PPTX file or JSON {name, text} or {url}.",
     )
 
 

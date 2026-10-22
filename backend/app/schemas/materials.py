@@ -17,7 +17,7 @@ class MaterialOut(OutBase):
     class_id: str
     owner_id: str | None = None
     name: str
-    kind: Literal["pdf", "docx", "pptx", "text"]
+    kind: Literal["pdf", "docx", "pptx", "text", "url"]
     text: str
     chunks: list[MaterialChunk] = Field(default_factory=list)
     created_at: datetime
@@ -27,7 +27,7 @@ class MaterialSummaryOut(OutBase):
     class_id: str
     owner_id: str | None = None
     name: str
-    kind: Literal["pdf", "docx", "pptx", "text"]
+    kind: Literal["pdf", "docx", "pptx", "text", "url"]
     chunk_count: int
     word_count: int
     created_at: datetime
