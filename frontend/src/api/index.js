@@ -160,6 +160,10 @@ export function uploadMaterialText(classId, body) {
   return post(`/classes/${classId}/materials`, body)
 }
 
+export function uploadMaterialUrl(classId, body) {
+  return post(`/classes/${classId}/materials`, body)
+}
+
 export function getMaterial(id) {
   return get(`/materials/${id}`)
 }

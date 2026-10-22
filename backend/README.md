@@ -29,7 +29,8 @@ A MongoDB server must be reachable at `MONGO_URI` (defaults to
 | `LLM_MODEL` | | Model name/id for the chosen provider, e.g. `gpt-4o-mini` or `claude-sonnet-5-5`. |
 | `LLM_API_KEY` | | Never commit a real key. Only `.env` (gitignored) or your shell environment should hold it. |
 | `LLM_BASE_URL` | | Optional, OpenAI-compatible providers only. |
-| `AI_DETECTOR` | `heuristic` | Only `heuristic` is implemented (see Known limits). |
+| `AI_DETECTOR` | `heuristic` | `heuristic` \| `gptzero`. GPTZero needs `GPTZERO_API_KEY` and falls back to heuristic if the key is missing or the API fails. |
+| `GPTZERO_API_KEY` | | Optional. Free-tier key from GPTZero when `AI_DETECTOR=gptzero`. |
 | `CORS_ORIGINS` | `http://localhost:5173` | Comma-separated list; the frontend origin(s) allowed to call the API. |
 | `MAX_UPLOAD_MB` | `25` | Default material-upload cap; overridable at runtime via `PUT /api/admin/settings`. |
 | `MAX_REQUEST_MB` | `50` | Hard ceiling on any request body (defence in depth, checked before the body is read). Keep this at or above `MAX_UPLOAD_MB`. |
@@ -47,6 +48,18 @@ recreates every collection with the same demo world as the v7 prototype (3
 departments, 17 users, 5 classes, 5 materials, 6 exams, a handful of
 attempts/requests/notifications). Every fixture-world user's password is
 `Test-Passw0rd!`.
+
+## NLP / embeddings (optional but recommended)
+
+```bash
+pip install -r requirements.txt
+python -m spacy download en_core_web_sm
+```
+
+`trafilatura` (URL materials), `spacy` (FR-05 cleaning), and
+`sentence-transformers` (FR-06 semantic chunking + FR-18 similarity) degrade
+gracefully to regex / token-overlap fallbacks if the packages or models are
+missing. Install them for full FYP quality.
 
 ## Running
 
@@ -100,11 +113,10 @@ Prints `PASS`/`FAIL` per step and exits non-zero if anything failed.
 - **No OCR.** PDF text extraction uses `pypdf`; a scanned PDF with no
   selectable text layer is rejected (`400 SCANNED_PDF`), not run through
   OCR.
-- **AI-writing detector is heuristic, not a trained model.** It scores
-  marker phrases, sentence length and answer length — the same logic as the
-  v7 prototype's `aiProb()`. It is advisory only: a flag never changes a
-  grade by itself, only a teacher's decision does. `AI_DETECTOR` has no
-  other implementation to switch to yet.
+- **AI-writing detector defaults to heuristic.** Marker phrases, sentence
+  length and answer length (v7 `aiProb()`). Set `AI_DETECTOR=gptzero` with
+  `GPTZERO_API_KEY` for the GPTZero API; on any failure it falls back to
+  the heuristic. Flags are advisory only — never auto-change a grade.
 - **English only.** Chunking, keyword grading fallback and the AI-writing
   markers all assume English text.
 - **Study assistant retrieval is keyword-based (BM25-style), not semantic.**

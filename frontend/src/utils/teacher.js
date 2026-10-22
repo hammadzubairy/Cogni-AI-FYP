@@ -95,6 +95,7 @@ export function kindLabel(kind) {
   if (kind === 'docx') return 'DOCX'
   if (kind === 'pptx') return 'PPTX'
   if (kind === 'text') return 'Notes'
+  if (kind === 'url') return 'Web page'
   return kind || '—'
 }
 
