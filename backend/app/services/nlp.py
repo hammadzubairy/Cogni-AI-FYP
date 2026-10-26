@@ -82,13 +82,12 @@ def preprocess_text(text: str, *, for_embedding: bool = False) -> str:
             ]
             parts.append(" ".join(tokens))
         else:
+            # Readable path: keep URLs/emails — teachers/LLM need citations.
             kept = []
             for t in doc:
                 if t.is_space:
                     if kept:
                         kept.append(t.text_with_ws)
-                    continue
-                if t.like_url or t.like_email:
                     continue
                 kept.append(t.text_with_ws)
             parts.append("".join(kept).strip())

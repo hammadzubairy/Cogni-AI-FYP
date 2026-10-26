@@ -44,21 +44,31 @@ function redirectToLogin() {
   window.location.assign('/login')
 }
 
-function parseDetail(body) {
+function parseDetail(body, headers) {
   if (!body || typeof body !== 'object') {
     return { detail: 'Request failed.', code: 'ERROR' }
   }
   const detail = body.detail
   let message = 'Request failed.'
+  let nestedCode = null
   if (typeof detail === 'string') message = detail
   else if (Array.isArray(detail)) {
     message = detail
       .map((d) => (typeof d === 'string' ? d : d?.msg || JSON.stringify(d)))
       .join('; ')
-  } else if (detail && typeof detail === 'object' && detail.msg) {
-    message = detail.msg
+  } else if (detail && typeof detail === 'object') {
+    if (typeof detail.detail === 'string') message = detail.detail
+    else if (detail.msg) message = detail.msg
+    if (detail.code) nestedCode = detail.code
   }
-  return { detail: message, code: body.code || 'ERROR' }
+  const headerCode =
+    headers && typeof headers.get === 'function'
+      ? headers.get('X-Error-Code') || headers.get('x-error-code')
+      : null
+  return {
+    detail: message,
+    code: body.code || nestedCode || headerCode || 'ERROR',
+  }
 }
 
 /**
@@ -110,8 +120,12 @@ export async function request(path, options = {}) {
 
   if (!res.ok) {
     // Only bounce on 401 when a Bearer token was sent (not public login failures).
-    if (res.status === 401 && sentAuth) redirectToLogin()
-    const { detail, code } = parseDetail(body)
+    // Do this before throwing so callers never leave a logged-in shell on a dead token.
+    if (res.status === 401 && sentAuth) {
+      redirectToLogin()
+      throw new ApiError(401, 'AUTH_ERROR', 'Session expired. Please sign in again.')
+    }
+    const { detail, code } = parseDetail(body, res.headers)
     throw new ApiError(res.status, code, detail || res.statusText || 'Request failed.')
   }
 

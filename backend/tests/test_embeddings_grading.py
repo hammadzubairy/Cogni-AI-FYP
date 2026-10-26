@@ -20,6 +20,28 @@ def test_blend_score_weights():
     assert _blend_score(10, 100, 100, 100) == 10.0
     # zero → zero
     assert _blend_score(10, 0, 0, 0) == 0.0
+    # Keywords alone must not inflate similarity channel (40%+20% ≠ 60% from keys only)
+    # sim=20, key=100, rubric=0 → 0.4*20 + 0.2*100 = 28% → 3.0/10
+    assert _blend_score(10, 20, 100, 0) == 3.0
+
+
+def test_gptzero_mixed_counts_as_ai():
+    from app.services.grading import _gptzero_probability
+
+    pct = _gptzero_probability(
+        {
+            "documents": [
+                {"class_probabilities": {"human": 0.1, "ai": 0.2, "mixed": 0.7}}
+            ]
+        }
+    )
+    # 1 - human = 0.9 → 90
+    assert pct == 90.0
+
+    pct2 = _gptzero_probability(
+        {"documents": [{"class_probabilities": {"ai": 0.0, "mixed": 0.8}}]}
+    )
+    assert pct2 == 80.0
 
 
 def test_heuristic_detector_short_answer():

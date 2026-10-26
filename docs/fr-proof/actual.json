@@ -1,0 +1,210 @@
+{
+  "passed": 34,
+  "total": 34,
+  "results": [
+    {
+      "id": "E0.1",
+      "ok": true,
+      "expected": "{\"status\":\"ok\"}",
+      "actual": "{\"status\":\"ok\"}"
+    },
+    {
+      "id": "E0.2",
+      "ok": true,
+      "expected": "HTTP 200",
+      "actual": "200"
+    },
+    {
+      "id": "E0.class",
+      "ok": true,
+      "expected": "CS-201-A exists",
+      "actual": "CS-201-A"
+    },
+    {
+      "id": "E2.3.pdf",
+      "ok": true,
+      "expected": "fyp-report.pdf in list",
+      "actual": "fyp-report.pdf"
+    },
+    {
+      "id": "E2.4",
+      "ok": true,
+      "expected": "pdf chunks>=1 words>=1000",
+      "actual": "{\"id\":\"6adba8c65c281b1be5082f87\",\"class_id\":\"6adba7bf67e4599de4fccc7b\",\"owner_id\":\"6adba7be67e4599de4fccc70\",\"name\":\"fyp-report.pdf\",\"kind\":\"pdf\",\"chunk_count\":32,\"word_count\":20824,\"created_at\":\"2026-10-23T18:34:46.303000\"}"
+    },
+    {
+      "id": "E2.3.pptx",
+      "ok": true,
+      "expected": "devops-lecture1.pptx in list",
+      "actual": "devops-lecture1.pptx"
+    },
+    {
+      "id": "E2.5",
+      "ok": true,
+      "expected": "pptx ok",
+      "actual": "{\"id\":\"6adba8c75c281b1be5082f8f\",\"class_id\":\"6adba7bf67e4599de4fccc7b\",\"owner_id\":\"6adba7be67e4599de4fccc70\",\"name\":\"devops-lecture1.pptx\",\"kind\":\"pptx\",\"chunk_count\":3,\"word_count\":1915,\"created_at\":\"2026-10-23T18:34:47.996000\"}"
+    },
+    {
+      "id": "E2.3.url",
+      "ok": true,
+      "expected": "Wikipedia / url material",
+      "actual": "Wikipedia Hash table"
+    },
+    {
+      "id": "E2.6",
+      "ok": true,
+      "expected": "url kind/chunks/words",
+      "actual": "{\"id\":\"6adba8cb5c281b1be5082f97\",\"class_id\":\"6adba7bf67e4599de4fccc7b\",\"owner_id\":\"6adba7be67e4599de4fccc70\",\"name\":\"Wikipedia Hash table\",\"kind\":\"url\",\"chunk_count\":9,\"word_count\":5860,\"created_at\":\"2026-10-23T18:34:51.332000\"}"
+    },
+    {
+      "id": "E4.1",
+      "ok": true,
+      "expected": "6 questions",
+      "actual": "status=201 q=6"
+    },
+    {
+      "id": "E4.2",
+      "ok": true,
+      "expected": "published",
+      "actual": "200"
+    },
+    {
+      "id": "E5.1",
+      "ok": true,
+      "expected": "student submitted",
+      "actual": "200"
+    },
+    {
+      "id": "E5.2",
+      "ok": true,
+      "expected": "similarity + ai_probability on written",
+      "actual": "[{\"t\":\"Short\",\"sim\":100,\"ai\":16},{\"t\":\"Short\",\"sim\":100,\"ai\":24},{\"t\":\"Essay\",\"sim\":100,\"ai\":11}]"
+    },
+    {
+      "id": "E1.1",
+      "ok": true,
+      "expected": "/app/teacher",
+      "actual": "http://127.0.0.1:5173/app/teacher"
+    },
+    {
+      "id": "E1.2",
+      "ok": true,
+      "expected": "portal + Ayesha",
+      "actual": "cogni.ai\nTEACHER PORTAL\nHome\nReview\n1\nneed attention\nComputer Science · Fall 2026\n2\nAK\nDr. Ayesha Khan\nSATURDAY 24 OCTOB"
+    },
+    {
+      "id": "E1.3",
+      "ok": true,
+      "expected": "dashboard content visible",
+      "actual": "cogni.ai\nTEACHER PORTAL\nHome\nReview\n1\nneed attention\nComputer Science · Fall 2026\n2\nAK\nDr. Ayesha Khan\nSATURDAY 24 OCTOBER\nGOOD MORNING, AYESHA\nNEXT UP · 5 MORE WAITING\n1 answer flagged as possibly AI-written\n\nReview it before you release results. Gr"
+    },
+    {
+      "id": "E1.4",
+      "ok": true,
+      "expected": "No loading spinner/label",
+      "actual": "loaded"
+    },
+    {
+      "id": "E2.1",
+      "ok": true,
+      "expected": "Course material heading",
+      "actual": "cogni.ai\nTEACHER PORTAL\nHome\nReview\n1\nneed attention\nComputer Science · Fall 2026\n2\nAK\nDr. Ayesha Kh"
+    },
+    {
+      "id": "E2.2",
+      "ok": true,
+      "expected": "three source tabs",
+      "actual": "tabs present"
+    },
+    {
+      "id": "E2.3.ui",
+      "ok": true,
+      "expected": "three materials visible",
+      "actual": "see text"
+    },
+    {
+      "id": "E2.7.list",
+      "ok": true,
+      "expected": "No loading spinner/label",
+      "actual": "loaded"
+    },
+    {
+      "id": "E3.1",
+      "ok": true,
+      "expected": "URL fields",
+      "actual": "cogni.ai\nTEACHER PORTAL\nHome\nReview\n1\nneed attention\nComputer Science · Fall 2026\n2\nAK\nDr. Ayesha Khan\nCourse material\nUpload\nClass\nCS-201-A · Data Structures\nCS-305-B · Database Systems\nSource\nFiles\n"
+    },
+    {
+      "id": "E3.2",
+      "ok": true,
+      "expected": "Process material button",
+      "actual": "true"
+    },
+    {
+      "id": "E2.7.url",
+      "ok": true,
+      "expected": "No loading spinner/label",
+      "actual": "loaded"
+    },
+    {
+      "id": "E2.files",
+      "ok": true,
+      "expected": "files dropzone",
+      "actual": "cogni.ai\nTEACHER PORTAL\nHome\nReview\n1\nneed attention\nComputer Science · Fall 2026\n2\nAK\nDr. Ayesha Khan\nCourse material\nUpload\nClass\nCS-201-A · Data St"
+    },
+    {
+      "id": "E2.7.files",
+      "ok": true,
+      "expected": "No loading spinner/label",
+      "actual": "loaded"
+    },
+    {
+      "id": "E6.1",
+      "ok": true,
+      "expected": "class detail loaded",
+      "actual": "cogni.ai\nTEACHER PORTAL\nHome\nReview\nComputer Science · Fall 2026\n2\nAK\nDr. Ayesha Khan\nHome\n/\nCS-201-A\nCS-201-A · Fall 2026 · Dr. Ayesha Khan\nData Structures\nJoin code\nDSX-4K2\nCopy\nOverview\nExams\nMater"
+    },
+    {
+      "id": "E6.2",
+      "ok": true,
+      "expected": "No loading spinner/label",
+      "actual": "loaded"
+    },
+    {
+      "id": "E4.3",
+      "ok": true,
+      "expected": "exam questions visible",
+      "actual": "cogni.ai\nTEACHER PORTAL\nHome\nReview\n1\nneed attention\nComputer Science · Fall 2026\n2\nAK\nDr. Ayesha Khan\nHome\n/\nCS-201-A\n/\nExams\n/\nQuiz · 20 min · 26 marks\nFR Expected Quiz\nLive\nNo approval needed\nClose exam…\nView results\nEditing is locked. Questions c"
+    },
+    {
+      "id": "E4.4",
+      "ok": true,
+      "expected": "No loading spinner/label",
+      "actual": "loaded"
+    },
+    {
+      "id": "E5.3",
+      "ok": true,
+      "expected": "grading UI visible",
+      "actual": "cogni.ai\nTEACHER PORTAL\nHome\nReview\n1\nneed attention\nComputer Science · Fall 2026\n2\nAK\nDr. Ayesha Khan\nHome\n/\nCS-201-A\n/\nExams\n/\nResults · FR Expected Quiz\nHamza Ali · 26/26\nSubmitted 23 Oct\nQ1\nMCQ\nUnderstand\nAutoExam.ai\n2 / 2\nItem 1 on AutoExam.ai: the source begins \"AutoExam.ai Final Year Project "
+    },
+    {
+      "id": "E5.4",
+      "ok": true,
+      "expected": "No loading spinner/label",
+      "actual": "loaded"
+    },
+    {
+      "id": "E5.5",
+      "ok": true,
+      "expected": "results page loaded",
+      "actual": "cogni.ai\nTEACHER PORTAL\nHome\nReview\n1\nneed attention\nComputer Science · Fall 2026\n2\nAK\nDr. Ayesha Khan\nHome\n/\nCS-201-A\n/\nExams\nResults · FR Expected Quiz\nView paper\nClose exam…\nRelease results…\nSubmitted\n1/6\nexam is live\nClass average\n100%\nAI-writing"
+    },
+    {
+      "id": "E5.5.shot",
+      "ok": true,
+      "expected": "No loading spinner/label",
+      "actual": "loaded"
+    }
+  ]
+}

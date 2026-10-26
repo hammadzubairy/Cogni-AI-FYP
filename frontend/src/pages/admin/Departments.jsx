@@ -41,6 +41,11 @@ export default function Departments() {
       setUsers(u || [])
       setClasses(c || [])
     } catch (err) {
+      // Dead JWT: client already redirects to /login — avoid flashing credentials error.
+      if (err instanceof ApiError && err.status === 401) {
+        setError(null)
+        return
+      }
       setError(err)
     } finally {
       setLoading(false)

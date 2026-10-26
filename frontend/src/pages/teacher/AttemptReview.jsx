@@ -46,29 +46,39 @@ export default function AttemptReview() {
   const [scoreErrors, setScoreErrors] = useState({})
   const [busyQ, setBusyQ] = useState(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const d = await api.getAttemptDetail(id)
-      const ex = await api.getExam(d.exam_id)
-      const c = await api.getClass(ex.class_id).catch(() => null)
-      const nextScores = {}
-      ;(d.questions || []).forEach((q) => {
-        nextScores[q.qid] = q.effective_score
-      })
-      setDetail(d)
-      setExam(ex)
-      setCls(c)
-      setScores(nextScores)
-      setScoreErrors({})
-    } catch (err) {
-      setError(err)
-      setDetail(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [id])
+  const load = useCallback(
+    async ({ soft = false } = {}) => {
+      if (!soft) {
+        setLoading(true)
+        setError(null)
+      }
+      try {
+        const d = await api.getAttemptDetail(id)
+        const ex = await api.getExam(d.exam_id)
+        const c = await api.getClass(ex.class_id).catch(() => null)
+        const nextScores = {}
+        ;(d.questions || []).forEach((q) => {
+          nextScores[q.qid] = q.effective_score
+        })
+        setDetail(d)
+        setExam(ex)
+        setCls(c)
+        setScores(nextScores)
+        if (!soft) setScoreErrors({})
+        if (soft) setError(null)
+      } catch (err) {
+        if (!soft) {
+          setError(err)
+          setDetail(null)
+        } else {
+          throw err
+        }
+      } finally {
+        if (!soft) setLoading(false)
+      }
+    },
+    [id],
+  )
 
   useEffect(() => {
     load()
@@ -83,7 +93,7 @@ export default function AttemptReview() {
           ? 'Flag cleared. Grade stands. Neither Clear nor Ask to discuss changes the grade.'
           : 'Student notified. Neither Clear nor Ask to discuss changes the grade.',
       )
-      await load()
+      await load({ soft: true })
     } catch (err) {
       toast(err instanceof ApiError ? err.message : 'Could not update flag.', { type: 'error' })
     } finally {
@@ -110,7 +120,7 @@ export default function AttemptReview() {
     try {
       await api.overrideAttemptScore(id, qid, v)
       toast('Score saved')
-      await load()
+      await load({ soft: true })
     } catch (err) {
       toast(err instanceof ApiError ? err.message : 'Could not save score.', { type: 'error' })
     } finally {
@@ -123,7 +133,7 @@ export default function AttemptReview() {
     return (
       <ShellError
         message={error.message || 'Submission not found.'}
-        onRetry={load}
+        onRetry={() => load()}
       />
     )
   }
@@ -250,7 +260,9 @@ export default function AttemptReview() {
                       <span>
                         AI-writing likelihood
                         <span className="small" style={{ display: 'block', fontWeight: 400 }}>
-                          heuristic estimate, advisory only
+                          {(detail.ai_detector || 'heuristic') === 'gptzero'
+                            ? 'GPTZero estimate, advisory only'
+                            : 'heuristic estimate, advisory only'}
                         </span>
                       </span>
                       <b

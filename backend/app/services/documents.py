@@ -158,6 +158,7 @@ async def ocr_pdf_pages(data: bytes) -> list[dict]:
 
     client = get_llm_client()
     if not isinstance(client, OpenAIClient):
+        # detail dict with code is passed through by http_exception_handler
         raise HTTPException(
             status_code=400,
             detail={

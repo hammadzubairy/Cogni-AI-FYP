@@ -230,11 +230,18 @@ export default function StudyAssistant() {
                   </div>
                 ) : null}
                 {m.r === 'a' ? <StudyMessageBody text={m.t} /> : m.t}
-                {(m.sources || []).map((s, i) => (
-                  <span className="src" key={i}>
-                    {s}
-                  </span>
-                ))}
+                {(m.sources || []).length ? (
+                  <div className="study-sources" style={{ marginTop: 8 }}>
+                    <div className="small" style={{ marginBottom: 4 }}>
+                      Page numbers refer to locations in the selected document.
+                    </div>
+                    {(m.sources || []).map((s, i) => (
+                      <span className="src" key={i}>
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             ))}
             {typing ? (

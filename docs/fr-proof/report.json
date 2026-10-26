@@ -1,0 +1,331 @@
+{
+  "started_at": "2026-10-23T18:34:41.181Z",
+  "deps": {
+    "trafilatura": true,
+    "spacy": false,
+    "sentence_transformers": false,
+    "note": "FR-05/06/18 run in regex/overlap fallback without spaCy/MiniLM installed"
+  },
+  "steps": [
+    {
+      "name": "API login + class",
+      "ok": true,
+      "class": "CS-201-A",
+      "id": "6adba7bf67e4599de4fccc7b",
+      "at": "2026-10-23T18:34:43.040Z"
+    },
+    {
+      "name": "FR-04/05/06 PDF upload",
+      "ok": true,
+      "status": 201,
+      "body": {
+        "id": "6adba8c65c281b1be5082f87",
+        "class_id": "6adba7bf67e4599de4fccc7b",
+        "owner_id": "6adba7be67e4599de4fccc70",
+        "name": "fyp-report.pdf",
+        "kind": "pdf",
+        "chunk_count": 32,
+        "word_count": 20824,
+        "created_at": "2026-10-23T18:34:46.303965Z"
+      },
+      "message": "kind=pdf chunks=32 words=20824",
+      "at": "2026-10-23T18:34:47.189Z"
+    },
+    {
+      "name": "FR-04/05/06 PPTX upload",
+      "ok": true,
+      "status": 201,
+      "body": {
+        "id": "6adba8c75c281b1be5082f8f",
+        "class_id": "6adba7bf67e4599de4fccc7b",
+        "owner_id": "6adba7be67e4599de4fccc70",
+        "name": "devops-lecture1.pptx",
+        "kind": "pptx",
+        "chunk_count": 3,
+        "word_count": 1915,
+        "created_at": "2026-10-23T18:34:47.996825Z"
+      },
+      "message": "kind=pptx chunks=3 words=1915",
+      "at": "2026-10-23T18:34:48.472Z"
+    },
+    {
+      "name": "FR-04 URL scrape (trafilatura)",
+      "ok": true,
+      "status": 201,
+      "body": {
+        "id": "6adba8cb5c281b1be5082f97",
+        "class_id": "6adba7bf67e4599de4fccc7b",
+        "owner_id": "6adba7be67e4599de4fccc70",
+        "name": "Wikipedia Hash table",
+        "kind": "url",
+        "chunk_count": 9,
+        "word_count": 5860,
+        "created_at": "2026-10-23T18:34:51.332684Z"
+      },
+      "message": "kind=url chunks=9 words=5860",
+      "at": "2026-10-23T18:34:51.960Z"
+    },
+    {
+      "name": "FR-05/06 chunk inspection",
+      "ok": true,
+      "chunk_count": 9,
+      "sample": [
+        {
+          "idx": 0,
+          "heading": null,
+          "page": null,
+          "words": 613,
+          "preview": "Hash table\n| Hash table | |\n|---|---|\n| Type | Unordered associative array |\n| Invented | 1953 |\n| Time complexity in big O notation | | | |\n|---|---|---|---|\n|"
+        },
+        {
+          "idx": 1,
+          "heading": null,
+          "page": null,
+          "words": 608,
+          "preview": "In the hash table implementation of associative arrays, an array of length is partially filled with elements, where . A key is hashed using a hash function to c"
+        },
+        {
+          "idx": 2,
+          "heading": null,
+          "page": null,
+          "words": 708,
+          "preview": "Hashing by multiplication\n[edit]\nThe scheme in hashing by multiplication is as follows:[11]: 2–3 Where is a non-integer real-valued constant and is the size of "
+        }
+      ],
+      "at": "2026-10-23T18:34:52.767Z"
+    },
+    {
+      "name": "FR-11 exam generate + quality filter",
+      "ok": true,
+      "status": 201,
+      "warnings": [
+        "Repeated question (similar to an earlier exam): \"Item 1 on AutoExam.ai: the source begins \"AutoExam.ai\nFinal \".",
+        "Repeated question (similar to an earlier exam): \"Item 2 on Topic 4: the source begins \"Out of scope is multi-\"."
+      ],
+      "q": 6,
+      "message": "questions=6",
+      "at": "2026-10-23T18:34:54.626Z"
+    },
+    {
+      "name": "Publish exam",
+      "ok": true,
+      "status": 200,
+      "at": "2026-10-23T18:34:55.828Z"
+    },
+    {
+      "name": "Student start attempt",
+      "ok": true,
+      "attempt_id": "6adba8d15c281b1be5082fa8",
+      "at": "2026-10-23T18:34:57.759Z"
+    },
+    {
+      "name": "Student submit (triggers FR-18/20 grading)",
+      "ok": true,
+      "status": 200,
+      "at": "2026-10-23T18:35:04.066Z"
+    },
+    {
+      "name": "FR-18 embedding/similarity field present",
+      "ok": true,
+      "samples": [
+        {
+          "type": "Short",
+          "similarity": 100,
+          "score": 5,
+          "max": 5,
+          "ai_probability": 16,
+          "reason": "Covers every key point"
+        },
+        {
+          "type": "Short",
+          "similarity": 100,
+          "score": 5,
+          "max": 5,
+          "ai_probability": 24,
+          "reason": "Covers every key point"
+        },
+        {
+          "type": "Essay",
+          "similarity": 100,
+          "score": 10,
+          "max": 10,
+          "ai_probability": 11,
+          "reason": "Covers every key point"
+        }
+      ],
+      "at": "2026-10-23T18:35:04.814Z"
+    },
+    {
+      "name": "FR-20 AI-writing likelihood present (heuristic)",
+      "ok": true,
+      "detector": "heuristic",
+      "at": "2026-10-23T18:35:04.814Z"
+    },
+    {
+      "name": "UI teacher login",
+      "ok": true,
+      "at": "2026-10-23T18:35:07.873Z"
+    },
+    {
+      "name": "UI Web link tab visible (FR-04)",
+      "ok": false,
+      "message": "tab not found",
+      "at": "2026-10-23T18:35:09.535Z"
+    },
+    {
+      "name": "UI exam detail",
+      "ok": true,
+      "exam_id": "6adba8ce5c281b1be5082f9f",
+      "at": "2026-10-23T18:35:11.052Z"
+    }
+  ],
+  "materials": [
+    {
+      "id": "6adba8c65c281b1be5082f87",
+      "class_id": "6adba7bf67e4599de4fccc7b",
+      "owner_id": "6adba7be67e4599de4fccc70",
+      "name": "fyp-report.pdf",
+      "kind": "pdf",
+      "chunk_count": 32,
+      "word_count": 20824,
+      "created_at": "2026-10-23T18:34:46.303965Z"
+    },
+    {
+      "id": "6adba8c75c281b1be5082f8f",
+      "class_id": "6adba7bf67e4599de4fccc7b",
+      "owner_id": "6adba7be67e4599de4fccc70",
+      "name": "devops-lecture1.pptx",
+      "kind": "pptx",
+      "chunk_count": 3,
+      "word_count": 1915,
+      "created_at": "2026-10-23T18:34:47.996825Z"
+    },
+    {
+      "id": "6adba8cb5c281b1be5082f97",
+      "class_id": "6adba7bf67e4599de4fccc7b",
+      "owner_id": "6adba7be67e4599de4fccc70",
+      "name": "Wikipedia Hash table",
+      "kind": "url",
+      "chunk_count": 9,
+      "word_count": 5860,
+      "created_at": "2026-10-23T18:34:51.332684Z"
+    }
+  ],
+  "exam": {
+    "id": "6adba8ce5c281b1be5082f9f",
+    "title": "FR Proof Quiz — Hashing & DevOps",
+    "warnings": [
+      "Repeated question (similar to an earlier exam): \"Item 1 on AutoExam.ai: the source begins \"AutoExam.ai\nFinal \".",
+      "Repeated question (similar to an earlier exam): \"Item 2 on Topic 4: the source begins \"Out of scope is multi-\"."
+    ],
+    "question_count": 6,
+    "blooms": [
+      "Understand",
+      "Analyze",
+      "Apply",
+      "Evaluate",
+      "Remember",
+      "Understand"
+    ],
+    "types": [
+      "MCQ",
+      "MCQ",
+      "MCQ",
+      "Short",
+      "Short",
+      "Essay"
+    ]
+  },
+  "grading": {
+    "ai_detector": "heuristic",
+    "written": [
+      {
+        "type": "Short",
+        "similarity": 100,
+        "score": 5,
+        "max": 5,
+        "ai_probability": 16,
+        "reason": "Covers every key point"
+      },
+      {
+        "type": "Short",
+        "similarity": 100,
+        "score": 5,
+        "max": 5,
+        "ai_probability": 24,
+        "reason": "Covers every key point"
+      },
+      {
+        "type": "Essay",
+        "similarity": 100,
+        "score": 10,
+        "max": 10,
+        "ai_probability": 11,
+        "reason": "Covers every key point"
+      }
+    ]
+  },
+  "verdicts": {
+    "FR-04 URL": true,
+    "FR-04 PDF/PPTX upload": true,
+    "FR-05 NLP": {
+      "ok": true,
+      "mode": "fallback-regex (spaCy not installed)",
+      "note": "preprocess_pages ran; spaCy model absent so regex cleaning used"
+    },
+    "FR-06 semantic chunking": {
+      "ok": true,
+      "mode": "fallback paragraph / overlap (sentence-transformers not installed)",
+      "chunk_sample": [
+        {
+          "idx": 0,
+          "heading": null,
+          "page": null,
+          "words": 613,
+          "preview": "Hash table\n| Hash table | |\n|---|---|\n| Type | Unordered associative array |\n| Invented | 1953 |\n| Time complexity in big O notation | | | |\n|---|---|---|---|\n|"
+        },
+        {
+          "idx": 1,
+          "heading": null,
+          "page": null,
+          "words": 608,
+          "preview": "In the hash table implementation of associative arrays, an array of length is partially filled with elements, where . A key is hashed using a hash function to c"
+        },
+        {
+          "idx": 2,
+          "heading": null,
+          "page": null,
+          "words": 708,
+          "preview": "Hashing by multiplication\n[edit]\nThe scheme in hashing by multiplication is as follows:[11]: 2–3 Where is a non-integer real-valued constant and is the size of "
+        }
+      ]
+    },
+    "FR-11 quality filter": true,
+    "FR-18 similarity": true,
+    "FR-20 AI detector": true
+  },
+  "chunk_sample": [
+    {
+      "idx": 0,
+      "heading": null,
+      "page": null,
+      "words": 613,
+      "preview": "Hash table\n| Hash table | |\n|---|---|\n| Type | Unordered associative array |\n| Invented | 1953 |\n| Time complexity in big O notation | | | |\n|---|---|---|---|\n|"
+    },
+    {
+      "idx": 1,
+      "heading": null,
+      "page": null,
+      "words": 608,
+      "preview": "In the hash table implementation of associative arrays, an array of length is partially filled with elements, where . A key is hashed using a hash function to c"
+    },
+    {
+      "idx": 2,
+      "heading": null,
+      "page": null,
+      "words": 708,
+      "preview": "Hashing by multiplication\n[edit]\nThe scheme in hashing by multiplication is as follows:[11]: 2–3 Where is a non-integer real-valued constant and is the size of "
+    }
+  ],
+  "finished_at": "2026-10-23T18:35:12.452Z"
+}
