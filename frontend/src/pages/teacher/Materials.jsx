@@ -147,22 +147,50 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
     acceptFiles(e.dataTransfer?.files)
   }
 
-  async function uploadFilesQueue(queue) {
-    let last = null
-    let ok = 0
+  async function resolveUploadQueue(queue) {
+    const toUpload = []
     for (let i = 0; i < queue.length; i += 1) {
       const f = queue[i]
-      setUploadProgress(`Uploading ${i + 1} of ${queue.length}: ${f.name}`)
+      const existing = materials.find((m) => {
+        const sameName =
+          String(m.name || '').trim().toLowerCase() === f.name.trim().toLowerCase()
+        if (!sameName) return false
+        if (fixedClassId) return true
+        return !m.class_id || m.class_id === activeClassId
+      })
+      if (existing) {
+        const replaceOk = await confirm({
+          title: 'File already exists',
+          body: `This file already exists. Want to replace it?\n\n${f.name}`,
+          ok: 'Replace',
+          tone: 'bad',
+        })
+        if (!replaceOk) continue
+        toUpload.push({ file: f, replace: true })
+      } else {
+        toUpload.push({ file: f, replace: false })
+      }
+    }
+    return toUpload
+  }
+
+  async function uploadFilesQueue(toUpload) {
+    let last = null
+    let ok = 0
+    for (let i = 0; i < toUpload.length; i += 1) {
+      const { file: f, replace } = toUpload[i]
+      setUploadProgress(`Uploading ${i + 1} of ${toUpload.length}: ${f.name}`)
       const fd = new FormData()
       fd.append('file', f)
       fd.append('name', f.name)
+      if (replace) fd.append('replace', 'true')
       last = await api.uploadMaterialPdf(activeClassId, fd)
       ok += 1
     }
-    return { last, ok, total: queue.length }
+    return { last, ok, total: toUpload.length }
   }
 
-  function startUpload() {
+  async function startUpload() {
     if (!activeClassId) {
       toast('Create a class first.', { type: 'error' })
       return
@@ -176,8 +204,13 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
         toast('Choose at least one PDF, DOCX, or PPTX file', { type: 'error' })
         return
       }
+      const toUpload = await resolveUploadQueue(files)
+      if (!toUpload.length) {
+        toast('Upload cancelled — existing file kept.')
+        return
+      }
       setBusy(true)
-      setPipePromise(uploadFilesQueue(files))
+      setPipePromise(uploadFilesQueue(toUpload))
       return
     }
 

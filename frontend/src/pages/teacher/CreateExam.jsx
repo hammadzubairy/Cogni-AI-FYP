@@ -222,17 +222,22 @@ export default function CreateExam() {
     setBusy(false)
     setPipePromise(null)
     const raw = err instanceof ApiError ? err.message : 'Generation failed.'
-    // Never dump raw provider JSON / token-limit noise at teachers.
+    const code = err instanceof ApiError ? err.code : ''
+    const status = err instanceof ApiError ? err.status : 0
+    // Only rewrite known size / rate-limit failures — keep other API details honest.
     let msg = raw
     const lower = String(raw).toLowerCase()
-    if (
+    const isSizeOrBusy =
+      status === 413 ||
+      code === 'RATE_LIMIT' ||
+      /rate.?limit/i.test(code || '') ||
       lower.includes('too large') ||
       lower.includes('413') ||
       lower.includes('itpm') ||
-      lower.includes('rate_limit') ||
-      lower.includes("{'error'") ||
-      lower.includes('{"error"')
-    ) {
+      lower.includes('rate_limit')
+    const isProviderNoise =
+      lower.includes("{'error'") || lower.includes('{"error"')
+    if (isSizeOrBusy || isProviderNoise) {
       msg =
         'The AI could not finish this draft — the material may be too large for one pass, or the service was busy. Try fewer source files or a shorter document, then press Retry.'
     } else if (msg.length > 220) {

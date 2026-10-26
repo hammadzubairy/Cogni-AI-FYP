@@ -14,7 +14,7 @@ httpx
 openai
 anthropic
 python-dotenv
-trafilatura
+trafilatura>=2.3
 spacy
 sentence-transformers
 ruff

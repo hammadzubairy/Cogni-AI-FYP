@@ -103,6 +103,33 @@ class GPTZeroDetector(AIDetector):
             return self._fallback.predict(txt)
 
 
+def _prob_to_percent(p: float) -> float:
+    return p * 100 if p <= 1 else p
+
+
+def _class_probabilities_ai_pct(probs: dict) -> float | None:
+    """Map GPTZero class_probabilities {human, ai, mixed} to 0-100 AI likelihood.
+
+    Treat `mixed` as AI-tainted (ai + mixed). Prefer `1 - human` when present.
+    """
+    human = probs.get("human")
+    ai = probs.get("ai", probs.get("AI", probs.get("generated", probs.get("fake"))))
+    mixed = probs.get("mixed")
+    if isinstance(human, (int, float)):
+        return _prob_to_percent(max(0.0, min(1.0, 1.0 - float(human))))
+    total = 0.0
+    found = False
+    if isinstance(ai, (int, float)):
+        total += float(ai)
+        found = True
+    if isinstance(mixed, (int, float)):
+        total += float(mixed)
+        found = True
+    if not found:
+        return None
+    return _prob_to_percent(max(0.0, min(1.0, total)))
+
+
 def _gptzero_probability(data: dict) -> float | None:
     """Extract a 0-100 AI likelihood from a GPTZero v2 response."""
     if not isinstance(data, dict):
@@ -118,19 +145,15 @@ def _gptzero_probability(data: dict) -> float | None:
         ):
             val = doc.get(key)
             if isinstance(val, dict):
-                # class_probabilities may be {ai: 0.8, human: 0.2}
-                for k in ("ai", "AI", "generated", "fake"):
-                    if isinstance(val.get(k), (int, float)):
-                        p = float(val[k])
-                        return p * 100 if p <= 1 else p
+                pct = _class_probabilities_ai_pct(val)
+                if pct is not None:
+                    return pct
             if isinstance(val, (int, float)):
-                p = float(val)
-                return p * 100 if p <= 1 else p
+                return _prob_to_percent(float(val))
     for key in ("completely_generated_prob", "average_generated_prob", "ai_probability"):
         val = data.get(key)
         if isinstance(val, (int, float)):
-            p = float(val)
-            return p * 100 if p <= 1 else p
+            return _prob_to_percent(float(val))
     return None
 
 
@@ -174,7 +197,7 @@ def _keyword_fallback(question: dict, answer: str) -> dict:
     hit, miss, coverage = _keyword_coverage(question, answer)
     model_answer = question.get("model_answer") or ""
     key_pct = coverage * 100
-    sim_pct = _similarity_signal(answer, model_answer, key_pct)
+    sim_pct = cosine_similarity_percent(answer, model_answer)
     len_factor = min(1.0, len(words) / (70 if question["type"] == "Essay" else 25))
     rubric_pct = round(len_factor * 10) if coverage == 0 else min(
         100, round(coverage * 92 + len_factor * 10)
@@ -188,20 +211,14 @@ def _keyword_fallback(question: dict, answer: str) -> dict:
     }
 
 
-def _similarity_signal(answer: str, model_answer: str, key_pct: float) -> int:
-    """Embedding cosine (FR-18), floored by keyword coverage so a sparse
-    model_answer cannot wipe out an otherwise solid keyword match."""
-    emb_sim = cosine_similarity_percent(answer, model_answer)
-    return max(emb_sim, int(round(key_pct)))
-
-
 async def _grade_written_llm(llm, question: dict, answer: str, detector: AIDetector) -> dict:
     max_marks = question["marks"]
     labels = {k["label"] for k in question.get("keywords", [])}
     model_answer = question.get("model_answer") or ""
     hit_kw, miss_kw, coverage = _keyword_coverage(question, answer)
     key_pct = coverage * 100
-    sim_pct = _similarity_signal(answer, model_answer, key_pct)
+    # FR-18: similarity is embedding-only (not floored by keywords — those are W_KEYS).
+    sim_pct = cosine_similarity_percent(answer, model_answer)
 
     user_prompt = build_grading_user_prompt(question, answer)
     try:

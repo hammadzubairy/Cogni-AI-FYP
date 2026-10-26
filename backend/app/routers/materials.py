@@ -18,18 +18,20 @@ async def upload_material(
     request: Request,
     teacher: CurrentUser = Depends(require_role("teacher")),
 ):
-    content_type = request.headers.get("content-type", "")
-    if content_type.startswith("multipart/form-data"):
+    content_type = (request.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+    if content_type == "multipart/form-data":
         form = await request.form()
         upload = form.get("file")
         if upload is None or not hasattr(upload, "read"):
             raise HTTPException(status_code=400, detail="No file was uploaded.")
         data = await upload.read()
         name = form.get("name") or upload.filename or "Untitled material"
+        replace_raw = str(form.get("replace") or "").strip().lower()
+        replace = replace_raw in ("1", "true", "yes", "on")
         return await material_service.upload_pdf_material(
-            teacher, class_id, filename=name, data=data
+            teacher, class_id, filename=name, data=data, replace=replace
         )
-    if content_type.startswith("application/json"):
+    if content_type == "application/json":
         body = await request.json() or {}
         url = body.get("url")
         if url:

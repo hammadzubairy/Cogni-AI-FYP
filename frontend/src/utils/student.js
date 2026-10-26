@@ -78,13 +78,30 @@ export function materialKindLabel(kind) {
   return kind || 'File'
 }
 
+/** Footer / running-header text that just restates the page number. */
+const PAGE_FOOTER_RE =
+  /^(\d+(\s*[-–—]\s*\d+)?)\s*(of|\/)\s*\d+$/i
+
+function isRedundantPageHeading(page, heading) {
+  const h = String(heading || '').trim()
+  if (!h) return true
+  if (PAGE_FOOTER_RE.test(h)) return true
+  const pageStr = String(page)
+  if (h === pageStr || h === `p. ${pageStr}` || h === `page ${pageStr}`) return true
+  // "9 of 103" style already covered; also bare "9" matching page
+  if (/^\d+$/.test(h) && h === pageStr) return true
+  return false
+}
+
 export function studySourceLabel(src) {
   if (!src) return null
   const page = src.page
   const heading = src.heading
-  if (page != null && heading) return `p. ${page} · ${heading}`
-  if (page != null) return `page ${page}`
-  if (heading) return heading
+  if (page != null && heading && !isRedundantPageHeading(page, heading)) {
+    return `Page ${page} in document · ${heading}`
+  }
+  if (page != null) return `Page ${page} in document`
+  if (heading && !PAGE_FOOTER_RE.test(String(heading).trim())) return heading
   return null
 }
 

@@ -59,10 +59,33 @@ def _material_summary(doc: dict) -> dict:
     return out
 
 
+async def _delete_same_name_materials(cls: dict, name: str) -> int:
+    """Remove prior materials in this class with the same name (case-insensitive)."""
+    db = get_db()
+    class_id = str(cls["_id"])
+    cursor = db.materials.find({"class_id": class_id})
+    removed = 0
+    target = name.strip().lower()
+    async for doc in cursor:
+        if str(doc.get("name") or "").strip().lower() == target:
+            await db.materials.delete_one({"_id": doc["_id"]})
+            removed += 1
+    return removed
+
+
 async def _insert_material(
-    actor: CurrentUser, cls: dict, *, name: str, kind: str, text: str, chunks: list[dict]
+    actor: CurrentUser,
+    cls: dict,
+    *,
+    name: str,
+    kind: str,
+    text: str,
+    chunks: list[dict],
+    replace: bool = False,
 ) -> dict:
     db = get_db()
+    if replace:
+        await _delete_same_name_materials(cls, name)
     doc = {
         "class_id": str(cls["_id"]),
         "owner_id": actor.id,
@@ -87,7 +110,12 @@ async def _insert_material(
 
 
 async def upload_pdf_material(
-    actor: CurrentUser, class_id: str, *, filename: str, data: bytes
+    actor: CurrentUser,
+    class_id: str,
+    *,
+    filename: str,
+    data: bytes,
+    replace: bool = False,
 ) -> dict:
     """Upload PDF / DOCX / PPTX. Name kept for API compatibility."""
     cls = await _get_class_or_404(class_id)
@@ -104,7 +132,9 @@ async def upload_pdf_material(
     pages = preprocess_pages(pages)
     chunks = chunk_pages(pages)
     text = "\n\n".join(p["text"] for p in pages)
-    return await _insert_material(actor, cls, name=filename, kind=kind, text=text, chunks=chunks)
+    return await _insert_material(
+        actor, cls, name=filename, kind=kind, text=text, chunks=chunks, replace=replace
+    )
 
 
 async def upload_text_material(actor: CurrentUser, class_id: str, *, name: str, text: str) -> dict:

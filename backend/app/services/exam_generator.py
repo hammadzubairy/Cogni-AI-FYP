@@ -190,10 +190,10 @@ async def filter_questions_quality(
     for row in results:
         if not isinstance(row, dict):
             continue
-        idx = row.get("index")
-        if not isinstance(idx, int) or isinstance(idx, bool):
+        idx = _coerce_index(row.get("index"))
+        if idx is None or not (0 <= idx < len(questions)):
             continue
-        if 0 <= idx < len(questions) and row.get("pass") is False:
+        if _is_quality_fail(row.get("pass")):
             rejected.add(idx)
             reason = str(row.get("reason") or "failed quality checks").strip()
             stem = questions[idx].get("text", "")[:60]
@@ -201,6 +201,26 @@ async def filter_questions_quality(
 
     kept = [q for i, q in enumerate(questions) if i not in rejected]
     return kept, warnings
+
+
+def _coerce_index(value) -> int | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float) and value == int(value):
+        return int(value)
+    if isinstance(value, str) and value.strip().lstrip("-").isdigit():
+        return int(value.strip())
+    return None
+
+
+def _is_quality_fail(pass_val) -> bool:
+    if pass_val is False or pass_val == 0:
+        return True
+    if isinstance(pass_val, str) and pass_val.strip().lower() in ("false", "0", "no", "fail"):
+        return True
+    return False
 
 
 async def generate_questions(
