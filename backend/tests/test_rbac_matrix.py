@@ -25,6 +25,8 @@ ALLOWED_ROLES: dict[tuple[str, str], set[str]] = {
     # ---- public ----
     ("GET", "/api/health"): {"anonymous", "student", "teacher", "hod", "admin"},
     ("POST", "/api/auth/login"): {"anonymous", "student", "teacher", "hod", "admin"},
+    ("POST", "/api/auth/verify-email"): {"anonymous", "student", "teacher", "hod", "admin"},
+    ("POST", "/api/auth/resend-verification"): {"anonymous", "student", "teacher", "hod", "admin"},
     ("GET", "/api/public/config"): {"anonymous", "student", "teacher", "hod", "admin"},
     ("GET", "/api/public/departments"): {"anonymous", "student", "teacher", "hod", "admin"},
     ("POST", "/api/setup/admin"): {"anonymous", "student", "teacher", "hod", "admin"},
@@ -34,6 +36,7 @@ ALLOWED_ROLES: dict[tuple[str, str], set[str]] = {
     # ---- any authenticated ----
     ("GET", "/api/auth/me"): {"student", "teacher", "hod", "admin"},
     ("POST", "/api/auth/change-password"): {"student", "teacher", "hod", "admin"},
+    ("POST", "/api/auth/switch-role"): {"student", "teacher", "hod", "admin"},
     ("GET", "/api/classes"): {"student", "teacher", "hod", "admin"},
     ("GET", "/api/exams"): {"student", "teacher", "hod", "admin"},
     ("GET", "/api/notifications"): {"student", "teacher", "hod", "admin"},
@@ -112,6 +115,8 @@ ALLOWED_ROLES: dict[tuple[str, str], set[str]] = {
 PUBLIC_ROUTES = {
     ("GET", "/api/health"),
     ("POST", "/api/auth/login"),
+    ("POST", "/api/auth/verify-email"),
+    ("POST", "/api/auth/resend-verification"),
     ("GET", "/api/public/config"),
     ("GET", "/api/public/departments"),
     ("POST", "/api/setup/admin"),
@@ -238,7 +243,11 @@ def _payload_for(method: str, path: str, world: dict) -> dict | None:
         ("POST", "/api/auth/login"): {
             "email": PERSONAS["admin"],
             "password": WORLD_PASSWORD,
+            "role": "admin",
         },
+        ("POST", "/api/auth/switch-role"): {"role": "admin"},
+        ("POST", "/api/auth/verify-email"): {"token": "not-a-real-token"},
+        ("POST", "/api/auth/resend-verification"): {"email": PERSONAS["admin"]},
         ("POST", "/api/admin/users"): {
             "name": "Temp User",
             "email": "rbac.temp@cogni.pk",
@@ -313,6 +322,9 @@ def _call(client, method: str, path: str, world: dict, role: str):
     if headers is not None:
         kwargs["headers"] = headers
     body = _payload_for(method, path, world)
+    # Switch portal must request a role the account holds (re-enter same portal).
+    if (method, path) == ("POST", "/api/auth/switch-role") and role != "anonymous":
+        body = {"role": role}
     if body is not None:
         kwargs["json"] = body
     return client.request(method, url, **kwargs)

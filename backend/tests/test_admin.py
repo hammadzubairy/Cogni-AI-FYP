@@ -5,14 +5,14 @@ from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.main import app
-from tests.helpers import WORLD_PASSWORD, WORLD_PASSWORD
+from tests.helpers import WORLD_PASSWORD, portal_for
 
 TEST_DB = os.environ.get("TEST_MONGO_DB", "cogni_test_dev")
 
 
 
 def _token(client, email, password=WORLD_PASSWORD):
-    resp = client.post("/api/auth/login", json={"email": email, "password": password})
+    resp = client.post("/api/auth/login", json={"email": email, "password": password, "role": portal_for(email)})
     return resp.json()["access_token"]
 
 
@@ -142,7 +142,7 @@ def test_reset_password_notifies_user(client):
     assert client.get("/api/auth/me", headers=student_headers).status_code == 401
 
     login_resp = client.post(
-        "/api/auth/login", json={"email": STUDENT_EMAIL, "password": temp}
+        "/api/auth/login", json={"email": STUDENT_EMAIL, "password": temp, "role": portal_for(STUDENT_EMAIL)}
     )
     assert login_resp.status_code == 200
     assert login_resp.json().get("scope") == "change_password"
@@ -152,6 +152,10 @@ def test_assign_hod_promotes_and_demotes(client):
     depts = client.get("/api/admin/departments", headers=_auth(client, ADMIN_EMAIL)).json()
     cs = next(d for d in depts if d["code"] == "CS")
     old_hod_id = cs["hod_id"]
+    # Capture old HOD JWT before demotion — must be invalidated via token_version.
+    old_hod_headers = _auth(client, HOD_EMAIL)
+    assert client.get("/api/hod/analytics", headers=old_hod_headers).status_code == 200
+
     new_hod_id = next(
         u["id"]
         for u in client.get(
@@ -174,6 +178,9 @@ def test_assign_hod_promotes_and_demotes(client):
         if u["id"] == old_hod_id
     )
     assert old_hod["role"] == "teacher"
+    # Demoted HOD's prior JWT is dead (not a sticky 403 Retry loop).
+    assert client.get("/api/hod/analytics", headers=old_hod_headers).status_code == 401
+    assert client.get("/api/auth/me", headers=old_hod_headers).status_code == 401
 
 
 def test_reassign_class_moves_exams_and_notifies(client):

@@ -12,7 +12,7 @@ from pymongo import AsyncMongoClient
 
 from app.core.config import settings
 from app.core.security import hash_password
-from tests.helpers import WORLD_PASSWORD, login_as
+from tests.helpers import WORLD_PASSWORD, login_as, portal_for
 
 # First 3 of each role in fixture-world insertion order (tests/support/world.py).
 EXPECTED_DEMO_EMAILS = {
@@ -67,7 +67,7 @@ async def test_student_self_signup_requires_email_verify(client):
     assert body["email"] == email
     assert "access_token" not in body
 
-    blocked = client.post("/api/auth/login", json={"email": email, "password": password})
+    blocked = client.post("/api/auth/login", json={"email": email, "password": password, "role": portal_for(email)})
     assert blocked.status_code == 403
     assert "verify" in blocked.json()["detail"].lower()
 
@@ -97,7 +97,7 @@ async def test_student_self_signup_requires_email_verify(client):
     verified = client.post("/api/auth/verify-email", json={"token": raw})
     assert verified.status_code == 204, verified.text
 
-    ok = client.post("/api/auth/login", json={"email": email, "password": password})
+    ok = client.post("/api/auth/login", json={"email": email, "password": password, "role": portal_for(email)})
     assert ok.status_code == 200
     assert ok.json()["user"]["role"] == "student"
     assert ok.json()["user"]["status"] == "active"
@@ -166,7 +166,7 @@ def test_login_success_for_fixture_world_accounts(client):
     for email in EXPECTED_DEMO_EMAILS:
         login = client.post(
             "/api/auth/login",
-            json={"email": email, "password": WORLD_PASSWORD},
+            json={"email": email, "password": WORLD_PASSWORD, "role": portal_for(email)},
         )
         assert login.status_code == 200, f"{email}: {login.text}"
         body = login.json()
@@ -181,11 +181,11 @@ def test_login_success_for_fixture_world_accounts(client):
 def test_login_wrong_password_and_unknown_email_same_401(client):
     wrong_pw = client.post(
         "/api/auth/login",
-        json={"email": "admin@cogni.pk", "password": "definitely-wrong"},
+        json={"email": "admin@cogni.pk", "password": "definitely-wrong", "role": portal_for("admin@cogni.pk")},
     )
     unknown = client.post(
         "/api/auth/login",
-        json={"email": "nobody@cogni.pk", "password": WORLD_PASSWORD},
+        json={"email": "nobody@cogni.pk", "password": WORLD_PASSWORD, "role": portal_for("nobody@cogni.pk")},
     )
     assert wrong_pw.status_code == 401
     assert unknown.status_code == 401
@@ -202,7 +202,7 @@ async def test_login_inactive_account_is_403(client):
     await _set_user_status("hamza.ali@umt.edu.pk", "inactive")
     resp = client.post(
         "/api/auth/login",
-        json={"email": "hamza.ali@umt.edu.pk", "password": WORLD_PASSWORD},
+        json={"email": "hamza.ali@umt.edu.pk", "password": WORLD_PASSWORD, "role": portal_for("hamza.ali@umt.edu.pk")},
     )
     assert resp.status_code == 403
     assert resp.json()["code"] == "FORBIDDEN"
@@ -233,7 +233,7 @@ def test_login_missing_or_malformed_fields(client, body):
 def test_token_claims_sub_role_exp(client):
     login = client.post(
         "/api/auth/login",
-        json={"email": "ayesha.khan@umt.edu.pk", "password": WORLD_PASSWORD},
+        json={"email": "ayesha.khan@umt.edu.pk", "password": WORLD_PASSWORD, "role": portal_for("ayesha.khan@umt.edu.pk")},
     )
     assert login.status_code == 200
     token = login.json()["access_token"]
@@ -260,7 +260,7 @@ def test_token_claims_sub_role_exp(client):
 def test_invalid_tokens_rejected_on_me(client, token_factory):
     login = client.post(
         "/api/auth/login",
-        json={"email": "admin@cogni.pk", "password": WORLD_PASSWORD},
+        json={"email": "admin@cogni.pk", "password": WORLD_PASSWORD, "role": portal_for("admin@cogni.pk")},
     )
     valid = login.json()["access_token"]
     user_id = login.json()["user"]["id"]
@@ -329,12 +329,12 @@ async def test_admin_reset_password_issues_temporary_password(client):
     await _set_password_hash(email, custom)
 
     assert (
-        client.post("/api/auth/login", json={"email": email, "password": custom}).status_code
+        client.post("/api/auth/login", json={"email": email, "password": custom, "role": portal_for(email)}).status_code
         == 200
     )
     assert (
         client.post(
-            "/api/auth/login", json={"email": email, "password": WORLD_PASSWORD}
+            "/api/auth/login", json={"email": email, "password": WORLD_PASSWORD, "role": portal_for(email)}
         ).status_code
         == 401
     )
@@ -350,10 +350,10 @@ async def test_admin_reset_password_issues_temporary_password(client):
     temp = reset.json()["temporary_password"]
 
     assert (
-        client.post("/api/auth/login", json={"email": email, "password": custom}).status_code
+        client.post("/api/auth/login", json={"email": email, "password": custom, "role": portal_for(email)}).status_code
         == 401
     )
-    ok = client.post("/api/auth/login", json={"email": email, "password": temp})
+    ok = client.post("/api/auth/login", json={"email": email, "password": temp, "role": portal_for(email)})
     assert ok.status_code == 200
     assert ok.json().get("scope") == "change_password"
 
@@ -363,7 +363,7 @@ async def test_admin_reset_password_issues_temporary_password(client):
 async def test_deactivated_users_existing_token_stops_on_me(client):
     login = client.post(
         "/api/auth/login",
-        json={"email": "bilal.ahmed@umt.edu.pk", "password": WORLD_PASSWORD},
+        json={"email": "bilal.ahmed@umt.edu.pk", "password": WORLD_PASSWORD, "role": portal_for("bilal.ahmed@umt.edu.pk")},
     )
     assert login.status_code == 200
     headers = {"Authorization": f"Bearer {login.json()['access_token']}"}

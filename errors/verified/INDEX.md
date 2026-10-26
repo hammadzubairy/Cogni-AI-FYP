@@ -13,3 +13,14 @@ All 7 Playwright checks in `frontend/e2e/errors-verify.spec.js` passed (local mo
 | E7 | Admin departments credentials error | Fixed | `E7-admin-departments.png` |
 
 Note: E2/E3 packaging also synced `python-docx` / `python-pptx` / `pymupdf` into `backend/pyproject.toml` for Vercel. Redeploy backend for production to pick that up. Scanned PDFs still need a live OpenAI-compatible OCR provider (mock shows the clear callout).
+
+## Auth + materials UI (2026-10-26)
+
+| ID | Check | Status | Screenshot |
+|----|--------|--------|------------|
+| M1 | Process material clears dropzone border | Fixed | `M1-materials-process-gap.png` |
+| A1 | HOD analytics loads (no permission banner) | Fixed | `A1-hod-analytics-ok.png` |
+| A2 | Demoted HOD JWT → 401 (not sticky 403) | Fixed | (API assert) |
+| A3 | HOD nav without forced re-login | Fixed | `A3-hod-nav-no-relogin.png` |
+
+Playwright: `frontend/e2e/auth-materials-verify.spec.js` — 4/4 passed.

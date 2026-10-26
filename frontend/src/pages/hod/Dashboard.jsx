@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as api from '../../api'
 import { useAuth } from '../../auth/AuthContext'
+import { redirectIfForbiddenRole } from '../../auth/redirectIfForbiddenRole'
 import { ShellError, ShellLoading } from '../../components/AppShell'
 import { Icon } from '../../components/IconSprite'
 import Pill from '../../components/Pill'
@@ -41,7 +42,7 @@ function buildItems(data, classById, teacherById) {
  * HOD home (v7 `P['h-dash']` / focusDash).
  */
 export default function Dashboard() {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
   const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [classes, setClasses] = useState([])
@@ -62,12 +63,13 @@ export default function Dashboard() {
       setClasses(cls || [])
       setTeachers(analytics?.teacher_activity || [])
     } catch (err) {
+      if (await redirectIfForbiddenRole(err, { refreshUser, navigate })) return
       setError(err)
       setData(null)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [refreshUser, navigate])
 
   useEffect(() => {
     load()

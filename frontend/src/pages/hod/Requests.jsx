@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as api from '../../api'
+import { useAuth } from '../../auth/AuthContext'
+import { redirectIfForbiddenRole } from '../../auth/redirectIfForbiddenRole'
 import { ShellError, ShellLoading } from '../../components/AppShell'
 import EmptyState from '../../components/EmptyState'
 import Field from '../../components/Field'
@@ -22,6 +24,7 @@ import {
 export default function Requests() {
   const navigate = useNavigate()
   const toast = useToast()
+  const { refreshUser } = useAuth()
 
   const [requests, setRequests] = useState([])
   const [classes, setClasses] = useState([])
@@ -69,12 +72,13 @@ export default function Requests() {
         return ts[0]?.teacher_id || ''
       })
     } catch (err) {
+      if (await redirectIfForbiddenRole(err, { refreshUser, navigate })) return
       setError(err)
       setRequests([])
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [refreshUser, navigate])
 
   useEffect(() => {
     load()

@@ -1,5 +1,6 @@
 from app.core.config import settings
 from app.core.db import get_db, to_out
+from app.core.roles import roles_query
 
 ROLES = ("admin", "hod", "teacher", "student")
 EXAM_STATUSES = ("draft", "pending", "returned", "approved", "published", "closed")
@@ -14,7 +15,7 @@ async def list_activity(role: str | None, limit: int) -> list[dict]:
 
 async def summary() -> dict:
     db = get_db()
-    users_by_role = {r: await db.users.count_documents({"role": r}) for r in ROLES}
+    users_by_role = {r: await db.users.count_documents(roles_query(r)) for r in ROLES}
     classes_count = await db.classes.count_documents({})
     papers_by_status = {s: await db.exams.count_documents({"status": s}) for s in EXAM_STATUSES}
     recent = [to_out(a) async for a in db.activity_log.find().sort("at", -1).limit(10)]
@@ -29,7 +30,7 @@ async def summary() -> dict:
 async def onboarding() -> dict:
     db = get_db()
     has_dept = await db.departments.count_documents({}) > 0
-    has_teacher = await db.users.count_documents({"role": "teacher"}) > 0
+    has_teacher = await db.users.count_documents(roles_query("teacher")) > 0
     has_head = await db.departments.count_documents({"hod_id": {"$ne": None}}) > 0
     has_class = await db.classes.count_documents({}) > 0
     has_student_joined = await db.classes.count_documents({"student_ids.0": {"$exists": True}}) > 0

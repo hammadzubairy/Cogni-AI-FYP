@@ -7,7 +7,7 @@ import concurrent.futures
 import pytest
 from bson import ObjectId
 
-from tests.helpers import WORLD_PASSWORD, login_as, make_exam_draft, upload_material
+from tests.helpers import WORLD_PASSWORD, login_as, make_exam_draft, upload_material, portal_for
 
 pytestmark = pytest.mark.security
 
@@ -90,9 +90,9 @@ def test_mass_assignment_ignored_on_user_create_and_patch(client):
         assert "password" not in user
         assert "password_hash" not in user
         assert "score" not in user
-        bad = client.post("/api/auth/login", json={"email": email, "password": "hacked"})
+        bad = client.post("/api/auth/login", json={"email": email, "password": "hacked", "role": portal_for(email)})
         assert bad.status_code == 401
-        ok = client.post("/api/auth/login", json={"email": email, "password": temp})
+        ok = client.post("/api/auth/login", json={"email": email, "password": temp, "role": portal_for(email)})
         assert ok.status_code == 200
         assert ok.json().get("scope") == "change_password"
 
@@ -280,7 +280,7 @@ def test_parallel_joins_same_code(client):
         )
         assert resp.status_code == 201, resp.text
         temp = resp.json()["temporary_password"]
-        scoped = client.post("/api/auth/login", json={"email": email, "password": temp})
+        scoped = client.post("/api/auth/login", json={"email": email, "password": temp, "role": portal_for(email)})
         assert scoped.status_code == 200
         changed = client.post(
             "/api/auth/change-password",
@@ -293,7 +293,7 @@ def test_parallel_joins_same_code(client):
     tokens = []
     for email in emails:
         tok = client.post(
-            "/api/auth/login", json={"email": email, "password": WORLD_PASSWORD}
+            "/api/auth/login", json={"email": email, "password": WORLD_PASSWORD, "role": portal_for(email)}
         ).json()["access_token"]
         tokens.append(tok)
 

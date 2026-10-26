@@ -12,6 +12,7 @@ class UserOut(OutBase):
     name: str
     email: str
     role: Role
+    roles: list[Role] = []
     dept_id: str | None = None
     status: UserStatus
     must_change_password: bool = False
@@ -34,6 +35,7 @@ class UserCreateResult(BaseModel):
 
 class UserUpdate(BaseModel):
     role: Role | None = None
+    roles: list[Role] | None = None
     dept_id: str | None = None
     status: UserStatus | None = None
 

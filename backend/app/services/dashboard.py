@@ -329,7 +329,11 @@ async def hod_analytics(hod: CurrentUser) -> dict:
         key=lambda item: item["percent"],
     )[:5]
 
-    teachers = [u async for u in db.users.find({"role": "teacher", "dept_id": hod.dept_id})]
+    from app.core.roles import roles_query
+
+    teachers = [
+        u async for u in db.users.find({"dept_id": hod.dept_id, **roles_query("teacher")})
+    ]
     teacher_activity: list[dict] = []
     for teacher in teachers:
         teacher_exams = [e for e in all_exams if e["teacher_id"] == str(teacher["_id"])]

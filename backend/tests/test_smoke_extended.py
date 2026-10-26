@@ -8,7 +8,7 @@ from pymongo import AsyncMongoClient
 from app.core.config import settings
 from app.main import app
 from tests.support.world import TEST_PASSWORD, main as world_main
-from tests.helpers import login_as
+from tests.helpers import login_as, portal_for
 
 pytestmark = pytest.mark.api
 
@@ -68,7 +68,7 @@ async def test_indexes_unique_email_and_join_code(client):
 def test_responses_never_leak_password_keys(client):
     login = client.post(
         "/api/auth/login",
-        json={"email": "admin@cogni.pk", "password": TEST_PASSWORD},
+        json={"email": "admin@cogni.pk", "password": TEST_PASSWORD, "role": portal_for("admin@cogni.pk")},
     )
     assert login.status_code == 200
     _assert_no_password_keys(login.json())

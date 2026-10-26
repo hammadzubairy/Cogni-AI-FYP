@@ -17,8 +17,12 @@ export function getHealth() {
 }
 
 /* ---------- auth ---------- */
-export function login(email, password) {
-  return post('/auth/login', { email, password }, { skipAuth: true })
+export function login(email, password, role) {
+  return post('/auth/login', { email, password, role }, { skipAuth: true })
+}
+
+export function switchRole(role) {
+  return post('/auth/switch-role', { role })
 }
 
 export function getMe() {

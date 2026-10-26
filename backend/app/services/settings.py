@@ -95,7 +95,18 @@ async def update_settings(actor: CurrentUser, fields: dict) -> dict:
     approval = updates.get("approval", (doc or {}).get("approval", DEFAULTS["approval"]))
     if old_approval is not None and "approval" in updates and old_approval != updates["approval"]:
         recipients = [
-            str(u["_id"]) async for u in db.users.find({"role": {"$in": ["teacher", "hod"]}})
+            str(u["_id"])
+            async for u in db.users.find(
+                {
+                    "$or": [
+                        {"roles": {"$in": ["teacher", "hod"]}},
+                        {
+                            "role": {"$in": ["teacher", "hod"]},
+                            "roles": {"$exists": False},
+                        },
+                    ]
+                }
+            )
         ]
         await notify(
             recipients,

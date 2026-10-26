@@ -36,11 +36,19 @@ export function clearToken() {
   setToken(null)
 }
 
+/** Concurrent 401s (shell polls) must only bounce once. */
+let redirectingToLogin = false
+
 function redirectToLogin() {
+  if (redirectingToLogin) return
+  redirectingToLogin = true
   clearToken()
   if (typeof window === 'undefined') return
   const path = window.location.pathname
-  if (path === '/login' || path === '/' || path === '/change-password') return
+  if (path === '/login' || path === '/' || path === '/change-password') {
+    redirectingToLogin = false
+    return
+  }
   window.location.assign('/login')
 }
 

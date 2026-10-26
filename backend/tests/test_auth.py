@@ -8,7 +8,7 @@ from pymongo import AsyncMongoClient
 from app.core.config import settings
 from app.core.deps import require_role
 from app.main import app
-from tests.helpers import WORLD_PASSWORD
+from tests.helpers import WORLD_PASSWORD, portal_for
 
 TEST_DB = os.environ.get("TEST_MONGO_DB", "cogni_test_dev")
 
@@ -44,7 +44,7 @@ async def _set_status(email: str, status: str) -> None:
 
 
 def _login(client, email, password=WORLD_PASSWORD):
-    return client.post("/api/auth/login", json={"email": email, "password": password})
+    return client.post("/api/auth/login", json={"email": email, "password": password, "role": portal_for(email)})
 
 
 @pytest.mark.parametrize(

@@ -25,11 +25,13 @@ async def create_first_admin(
     err = validate_password(password, email=email_n, name=name)
     if err:
         raise HTTPException(status_code=400, detail=err)
+    from app.core.roles import with_roles_fields
+
     doc = {
         "name": name.strip(),
         "email": email_n,
         "password_hash": hash_password(password),
-        "role": "admin",
+        **with_roles_fields(["admin"]),
         "dept_id": None,
         "status": "active",
         "must_change_password": False,

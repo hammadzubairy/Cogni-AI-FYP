@@ -6,6 +6,11 @@ from app.schemas.users import Role, UserStatus
 class LoginRequest(BaseModel):
     email: str
     password: str
+    role: Role
+
+
+class SwitchRoleRequest(BaseModel):
+    role: Role
 
 
 class TokenUser(BaseModel):
@@ -13,6 +18,7 @@ class TokenUser(BaseModel):
     name: str
     email: str
     role: Role
+    roles: list[Role] = []
     dept_id: str | None = None
     status: UserStatus = "active"
     must_change_password: bool = False

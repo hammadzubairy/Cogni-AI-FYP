@@ -41,7 +41,12 @@ async def _record_failure(email: str) -> None:
     await db.login_failures.insert_one({"email": email, "at": datetime.now(UTC)})
 
 
-async def authenticate(email: str, password: str) -> dict:
+PORTAL_DENIED = "You do not have access to that portal."
+
+
+async def authenticate(email: str, password: str, portal_role: str) -> dict:
+    from app.core.roles import user_roles
+
     db = get_db()
     email_n = email.strip().lower()
     failures = await _count_recent_failures(email_n)
@@ -62,10 +67,17 @@ async def authenticate(email: str, password: str) -> dict:
         raise AuthError(401, GENERIC_LOGIN_ERROR)
     if not verify_password(password, user["password_hash"]):
         await _record_failure(email_n)
+        from app.core.roles import primary_role, user_roles as _ur
+
+        roles = _ur(user)
         await log_activity(
             None,
             f"Failed login for {email_n}",
-            actor_override={"id": str(user["_id"]), "name": user["name"], "role": user["role"]},
+            actor_override={
+                "id": str(user["_id"]),
+                "name": user["name"],
+                "role": primary_role(roles) if roles else user.get("role", "student"),
+            },
         )
         raise AuthError(401, GENERIC_LOGIN_ERROR)
     status = user.get("status", "active")
@@ -74,38 +86,69 @@ async def authenticate(email: str, password: str) -> dict:
     if status != "active":
         raise AuthError(403, INACTIVE_ERROR)
 
+    if portal_role not in user_roles(user):
+        raise AuthError(403, PORTAL_DENIED)
+
     await db.users.update_one(
         {"_id": user["_id"]}, {"$set": {"last_login_at": datetime.now(UTC)}}
     )
     return user
 
 
-def issue_tokens_for(user: dict) -> tuple[str, str | None]:
-    """Return (access_token, scope). scope is change_password when required."""
+def issue_tokens_for(user: dict, *, role: str | None = None) -> tuple[str, str | None]:
+    """Return (access_token, scope). JWT role is the active portal."""
+    from app.core.roles import primary_role, user_roles
+
+    roles = user_roles(user)
+    portal = role or (primary_role(roles) if roles else user.get("role"))
+    if portal not in roles:
+        raise AuthError(403, PORTAL_DENIED)
     scope = "change_password" if user.get("must_change_password") else None
     token = create_token(
         str(user["_id"]),
-        user["role"],
+        portal,
         token_version=int(user.get("token_version", 0)),
         scope=scope,
     )
     return token, scope
 
 
-async def user_public_fields(user: dict) -> dict:
+async def switch_role(user_id: str, portal_role: str) -> dict:
+    """Re-load user and verify portal membership (caller issues tokens)."""
+    from app.core.roles import user_roles
+
+    db = get_db()
+    user = await db.users.find_one({"_id": oid(user_id)})
+    if user is None:
+        raise HTTPException(status_code=401, detail=GENERIC_LOGIN_ERROR)
+    if user.get("status") != "active":
+        raise HTTPException(status_code=403, detail=INACTIVE_ERROR)
+    if portal_role not in user_roles(user):
+        raise HTTPException(status_code=403, detail=PORTAL_DENIED)
+    return user
+
+
+async def user_public_fields(user: dict, *, active_role: str | None = None) -> dict:
+    from app.core.roles import primary_role, user_roles
+
     s = await settings_service.get_settings()
     dept_name = None
     if user.get("dept_id"):
-        from app.core.db import oid
+        from app.core.db import oid as _oid
 
-        dept = await get_db().departments.find_one({"_id": oid(user["dept_id"])})
+        dept = await get_db().departments.find_one({"_id": _oid(user["dept_id"])})
         if dept:
             dept_name = dept.get("name")
+    roles = user_roles(user)
+    role = active_role if active_role and active_role in roles else (
+        primary_role(roles) if roles else user.get("role")
+    )
     return {
         "id": str(user["_id"]),
         "name": user["name"],
         "email": user["email"],
-        "role": user["role"],
+        "role": role,
+        "roles": roles,
         "dept_id": user.get("dept_id"),
         "status": user.get("status", "active"),
         "must_change_password": bool(user.get("must_change_password", False)),
@@ -187,22 +230,19 @@ async def register_user(
         )
 
     email_n = email.strip().lower()
-    domains = s.get("allowed_email_domains") or []
-    if domains:
-        domain = email_n.split("@")[-1] if "@" in email_n else ""
-        if domain not in domains:
-            raise HTTPException(status_code=400, detail="Email domain is not allowed.")
     err = validate_password(password, email=email_n, name=name)
     if err:
         raise HTTPException(status_code=400, detail=err)
     if await db.users.find_one({"email": email_n}):
         raise HTTPException(status_code=409, detail="Could not create that account.")
 
+    from app.core.roles import with_roles_fields
+
     doc = {
         "name": name.strip(),
         "email": email_n,
         "password_hash": hash_password(password),
-        "role": "student",
+        **with_roles_fields(["student"]),
         "dept_id": None,
         "status": "pending_verification",
         "must_change_password": False,
@@ -334,6 +374,7 @@ __all__ = [
     "AuthError",
     "authenticate",
     "issue_tokens_for",
+    "switch_role",
     "user_public_fields",
     "change_password",
     "register_user",

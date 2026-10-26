@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from tests.helpers import WORLD_PASSWORD, login_as, make_exam_draft, upload_material
+from tests.helpers import WORLD_PASSWORD, login_as, make_exam_draft, upload_material, portal_for
 
 pytestmark = pytest.mark.e2e
 
@@ -57,7 +57,7 @@ def test_full_demo_loop(client):
         temp = body["temporary_password"]
         # Complete forced password change so normal tokens work.
         tok = client.post(
-            "/api/auth/login", json={"email": user["email"], "password": temp}
+            "/api/auth/login", json={"email": user["email"], "password": temp, "role": portal_for(user["email"])}
         ).json()["access_token"]
         changed = client.post(
             "/api/auth/change-password",

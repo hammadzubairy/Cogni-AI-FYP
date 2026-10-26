@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react'
 import * as api from '../api'
@@ -46,17 +47,74 @@ function applyAuthResult(res, setUser, setScope) {
   return res.user
 }
 
+function rolePrefix(role) {
+  return ROLE_HOME[role] || null
+}
+
+/** If the path is under an old role's app area, send them to the new role home. */
+function maybeRedirectForRoleChange(oldRole, newRole) {
+  if (!oldRole || !newRole || oldRole === newRole) return
+  if (typeof window === 'undefined') return
+  const oldHome = rolePrefix(oldRole)
+  const newHome = rolePrefix(newRole)
+  if (!oldHome || !newHome) return
+  const path = window.location.pathname
+  if (path === oldHome || path.startsWith(`${oldHome}/`)) {
+    window.location.assign(newHome)
+  }
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [scope, setScope] = useState(null)
   const [loading, setLoading] = useState(true)
   const [publicConfig, setPublicConfig] = useState(null)
   const [configLoading, setConfigLoading] = useState(true)
+  const userRef = useRef(null)
+  userRef.current = user
 
   const refreshPublicConfig = useCallback(async () => {
     const cfg = await api.publicConfig()
     setPublicConfig(cfg)
     return cfg
+  }, [])
+
+  const refreshUser = useCallback(async () => {
+    const token = getToken()
+    if (!token) {
+      setUser(null)
+      setScope(null)
+      saveUserSnapshot(null)
+      return null
+    }
+    const prev = userRef.current
+    try {
+      const me = await api.getMe()
+      setUser(me)
+      saveUserSnapshot(me)
+      setScope(me.must_change_password ? 'change_password' : null)
+      if (prev?.role && me?.role && prev.role !== me.role) {
+        maybeRedirectForRoleChange(prev.role, me.role)
+      }
+      return me
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 403) {
+        const snap = loadUserSnapshot()
+        if (snap) {
+          setUser(snap)
+          setScope('change_password')
+          return snap
+        }
+      }
+      if (err instanceof ApiError && err.status === 401) {
+        // client.js already clears token + redirects
+        setUser(null)
+        setScope(null)
+        saveUserSnapshot(null)
+        return null
+      }
+      throw err
+    }
   }, [])
 
   useEffect(() => {
@@ -126,8 +184,30 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  const login = useCallback(async (email, password) => {
-    const res = await api.login(email, password)
+  useEffect(() => {
+    function onFocusOrVisible() {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      if (!getToken()) return
+      refreshUser().catch(() => {
+        /* ignore background refresh failures */
+      })
+    }
+    window.addEventListener('focus', onFocusOrVisible)
+    document.addEventListener('visibilitychange', onFocusOrVisible)
+    return () => {
+      window.removeEventListener('focus', onFocusOrVisible)
+      document.removeEventListener('visibilitychange', onFocusOrVisible)
+    }
+  }, [refreshUser])
+
+  const login = useCallback(async (email, password, role) => {
+    const res = await api.login(email, password, role)
+    return applyAuthResult(res, setUser, setScope)
+  }, [])
+
+  const switchRole = useCallback(async (role) => {
+    const res = await api.switchRole(role)
+    // Caller (AppShell) navigates to ROLE_HOME; avoid a hard window.location race.
     return applyAuthResult(res, setUser, setScope)
   }, [])
 
@@ -170,12 +250,14 @@ export function AuthProvider({ children }) {
       scope,
       mustChangePassword,
       login,
+      switchRole,
       logout,
       loading,
       isAuthenticated: !!user,
       publicConfig,
       configLoading,
       refreshPublicConfig,
+      refreshUser,
       completeSetup,
       register,
       registerStudent,
@@ -186,11 +268,13 @@ export function AuthProvider({ children }) {
       scope,
       mustChangePassword,
       login,
+      switchRole,
       logout,
       loading,
       publicConfig,
       configLoading,
       refreshPublicConfig,
+      refreshUser,
       completeSetup,
       register,
       registerStudent,

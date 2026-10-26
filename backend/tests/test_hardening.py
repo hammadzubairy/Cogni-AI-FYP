@@ -8,6 +8,7 @@ from app.core.middleware import RequestSizeLimitMiddleware
 from app.core.ratelimit import login_limiter
 from app.main import app
 from tests.support.world import TEST_PASSWORD, main as world_main
+from tests.helpers import portal_for
 
 TEST_DB = os.environ.get("TEST_MONGO_DB", "cogni_test_dev")
 
@@ -32,11 +33,11 @@ def test_login_is_rate_limited_after_10_per_minute(client, monkeypatch):
     monkeypatch.setattr(login_limiter, "max_calls", 10)
     for _ in range(10):
         resp = client.post(
-            "/api/auth/login", json={"email": "nobody@umt.edu.pk", "password": "wrong"}
+            "/api/auth/login", json={"email": "nobody@umt.edu.pk", "password": "wrong", "role": portal_for("nobody@umt.edu.pk")}
         )
         assert resp.status_code == 401
 
-    resp = client.post("/api/auth/login", json={"email": "nobody@umt.edu.pk", "password": "wrong"})
+    resp = client.post("/api/auth/login", json={"email": "nobody@umt.edu.pk", "password": "wrong", "role": portal_for("nobody@umt.edu.pk")})
     assert resp.status_code == 429
     assert resp.json()["code"] == "RATE_LIMITED"
 
@@ -47,7 +48,7 @@ def test_unhandled_exception_returns_generic_500(client, monkeypatch):
 
     monkeypatch.setattr("app.services.admin.summary", boom)
     token = client.post(
-        "/api/auth/login", json={"email": "admin@cogni.pk", "password": TEST_PASSWORD}
+        "/api/auth/login", json={"email": "admin@cogni.pk", "password": TEST_PASSWORD, "role": portal_for("admin@cogni.pk")}
     ).json()["access_token"]
 
     resp = client.get("/api/admin/summary", headers={"Authorization": f"Bearer {token}"})

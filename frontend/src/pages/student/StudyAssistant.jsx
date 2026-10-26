@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import * as api from '../../api'
 import { ApiError } from '../../api/client'
 import { ShellError, ShellLoading } from '../../components/AppShell'
+import { useConfirm } from '../../components/ConfirmModal'
 import EmptyState from '../../components/EmptyState'
 import { Icon } from '../../components/IconSprite'
 import PageTop from '../../components/PageTop'
@@ -24,6 +25,14 @@ function AiChip({ children = 'Study assistant' }) {
 }
 
 const SECTION_RE = /^(practice question|question|good answer|model answer|answer outline)\s*:?$/i
+
+function greetingMessage(doc) {
+  return {
+    r: 'a',
+    t: `Hi. Ask me anything about "${doc.name}". I answer only from this material and show the page I used.`,
+    id: `greet-${doc.id}`,
+  }
+}
 
 /** Render assistant text with clear section labels and line breaks. */
 function StudyMessageBody({ text }) {
@@ -53,6 +62,7 @@ function StudyMessageBody({ text }) {
 export default function StudyAssistant() {
   const [searchParams, setSearchParams] = useSearchParams()
   const docParam = searchParams.get('doc') || ''
+  const confirm = useConfirm()
 
   const [docs, setDocs] = useState([])
   const [docId, setDocId] = useState(docParam)
@@ -104,13 +114,7 @@ export default function StudyAssistant() {
       if (prev[doc.id]) return prev
       return {
         ...prev,
-        [doc.id]: [
-          {
-            r: 'a',
-            t: `Hi. Ask me anything about "${doc.name}". I answer only from this material and show the page I used.`,
-            id: `greet-${doc.id}`,
-          },
-        ],
+        [doc.id]: [greetingMessage(doc)],
       }
     })
   }, [doc])
@@ -125,6 +129,31 @@ export default function StudyAssistant() {
     const next = new URLSearchParams(searchParams)
     next.set('doc', id)
     setSearchParams(next, { replace: true })
+  }
+
+  function applyClearChat(material) {
+    setChats((prev) => ({
+      ...prev,
+      [material.id]: [greetingMessage(material)],
+    }))
+  }
+
+  async function onClearChat(material, e) {
+    e.preventDefault()
+    e.stopPropagation()
+    const thread = chats[material.id] || []
+    const hasExtra = thread.length > 1
+    if (hasExtra) {
+      const ok = await confirm({
+        title: 'Clear this chat?',
+        body: `Remove the conversation for “${material.name}”? The material file stays.`,
+        ok: 'Clear chat',
+        tone: 'bad',
+      })
+      if (!ok) return
+    }
+    applyClearChat(material)
+    if (docId !== material.id) selectDoc(material.id)
   }
 
   async function ask(question) {
@@ -196,17 +225,29 @@ export default function StudyAssistant() {
             Material
           </div>
           {docs.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              className={`doc${m.id === doc?.id ? ' on' : ''}`}
-              onClick={() => selectDoc(m.id)}
-            >
-              {m.name}
-              <span>
-                {m.class_code || materialKindLabel(m.kind)}
-              </span>
-            </button>
+            <div key={m.id} className={`doc-row${m.id === doc?.id ? ' on' : ''}`}>
+              <button
+                type="button"
+                className={`doc${m.id === doc?.id ? ' on' : ''}`}
+                title={m.name}
+                onClick={() => selectDoc(m.id)}
+              >
+                <span className="doc-name">{m.name}</span>
+                <span className="doc-meta">
+                  {m.class_code || materialKindLabel(m.kind)}
+                </span>
+              </button>
+              <button
+                type="button"
+                className="btn small icon doc-clear"
+                aria-label={`Clear chat for ${m.name}`}
+                title="Clear chat"
+                disabled={typing}
+                onClick={(e) => onClearChat(m, e)}
+              >
+                <Icon name="trash" className="sm" />
+              </button>
+            </div>
           ))}
         </div>
         <div className="conv">

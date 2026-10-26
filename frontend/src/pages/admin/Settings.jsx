@@ -26,7 +26,6 @@ export default function Settings() {
   const [institutionName, setInstitutionName] = useState('')
   const [currentTerm, setCurrentTerm] = useState('')
   const [studentSignup, setStudentSignup] = useState(true)
-  const [domainsText, setDomainsText] = useState('')
   const [activity, setActivity] = useState([])
   const [roleFilter, setRoleFilter] = useState('')
   const [loading, setLoading] = useState(true)
@@ -53,7 +52,6 @@ export default function Settings() {
         setInstitutionName(s.institution_name || '')
         setCurrentTerm(s.current_term || '')
         setStudentSignup(s.student_signup_enabled !== false)
-        setDomainsText((s.allowed_email_domains || []).join('\n'))
       }
     } catch (err) {
       setError(err)
@@ -77,10 +75,6 @@ export default function Settings() {
 
     setSaving(true)
     try {
-      const allowed_email_domains = domainsText
-        .split(/[\n,]+/)
-        .map((d) => d.trim().toLowerCase())
-        .filter(Boolean)
       const updated = await api.putAdminSettings({
         approval,
         max_upload_mb: Math.round(mb),
@@ -88,7 +82,6 @@ export default function Settings() {
         institution_name: institutionName.trim(),
         current_term: currentTerm.trim(),
         student_signup_enabled: studentSignup,
-        allowed_email_domains,
       })
       setSettings(updated)
       toast('Settings saved')
@@ -234,20 +227,6 @@ export default function Settings() {
                     </small>
                   </span>
                 </label>
-                <Field
-                  id="st-dom"
-                  label="Allowed email domains (optional)"
-                  hint="One domain per line, e.g. school.edu. Leave empty to allow any domain."
-                >
-                  <textarea
-                    id="st-dom"
-                    rows={3}
-                    value={domainsText}
-                    onChange={(e) => setDomainsText(e.target.value)}
-                    disabled={saving}
-                    placeholder="school.edu"
-                  />
-                </Field>
               </div>
             </div>
             <div className="panel">

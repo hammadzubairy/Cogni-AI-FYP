@@ -14,7 +14,7 @@ from datetime import datetime, timezone
 import pytest
 
 from app.main import app
-from tests.helpers import WORLD_PASSWORD, login_as, upload_material
+from tests.helpers import WORLD_PASSWORD, login_as, upload_material, portal_for
 
 pytestmark = pytest.mark.api
 
@@ -158,7 +158,7 @@ def test_all_openapi_routes_reachable(client, hit_routes):
     ju_body = ju.json()
     join_student_id = ju_body.get("user", ju_body)["id"]
     temp = ju_body["temporary_password"]
-    scoped = client.post("/api/auth/login", json={"email": join_email, "password": temp})
+    scoped = client.post("/api/auth/login", json={"email": join_email, "password": temp, "role": portal_for(join_email)})
     assert scoped.status_code == 200
     changed = client.post(
         "/api/auth/change-password",
@@ -236,7 +236,8 @@ def test_all_openapi_routes_reachable(client, hit_routes):
         ("GET", "/api/health", None, None),
         ("GET", "/api/public/config", None, None),
         ("GET", "/api/public/departments", None, None),
-        ("POST", "/api/auth/login", None, {"email": "admin@cogni.pk", "password": WORLD_PASSWORD}),
+        ("POST", "/api/auth/login", None, {"email": "admin@cogni.pk", "password": WORLD_PASSWORD, "role": "admin"}),
+        ("POST", "/api/auth/switch-role", admin, {"role": "admin"}),
         ("POST", "/api/auth/forgot", None, {"email": "admin@cogni.pk"}),
         ("POST", "/api/auth/register", None, {
             "name": f"Cov Reg {tag}",

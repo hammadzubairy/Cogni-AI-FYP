@@ -18,8 +18,8 @@ async def setup_admin(payload: SetupAdminRequest, request: Request):
         payload.institution_name,
         payload.current_term,
     )
-    token, scope = auth_service.issue_tokens_for(user)
-    fields = await auth_service.user_public_fields(user)
+    token, scope = auth_service.issue_tokens_for(user, role="admin")
+    fields = await auth_service.user_public_fields(user, active_role="admin")
     return LoginResponse(
         access_token=token,
         scope=scope,

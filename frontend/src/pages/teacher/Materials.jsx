@@ -515,7 +515,7 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
             </p>
           ) : null}
 
-          <div className="row">
+          <div className="row" style={{ marginTop: 4 }}>
             <button
               type="button"
               className={`btn primary${busy ? ' busy' : ''}`}

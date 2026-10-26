@@ -6,6 +6,13 @@ import { ROLE_HOME, useAuth } from '../../auth/AuthContext'
 import { Icon } from '../../components/IconSprite'
 import AuthShell from './AuthShell'
 
+const PORTALS = [
+  { value: 'student', label: 'Student' },
+  { value: 'teacher', label: 'Teacher' },
+  { value: 'hod', label: 'Head of Department' },
+  { value: 'admin', label: 'Admin' },
+]
+
 export default function Login() {
   const { user, login, loading: authLoading, publicConfig, mustChangePassword } = useAuth()
   const navigate = useNavigate()
@@ -13,6 +20,7 @@ export default function Login() {
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [portal, setPortal] = useState('student')
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -39,12 +47,12 @@ export default function Login() {
 
   const signupEnabled = publicConfig?.student_signup_enabled !== false
 
-  const doLogin = async (em, pw) => {
+  const doLogin = async (em, pw, role) => {
     setError('')
     setNotice('')
     setSubmitting(true)
     try {
-      const u = await login(em.trim(), pw)
+      const u = await login(em.trim(), pw, role)
       if (u.must_change_password) {
         navigate('/change-password', { replace: true })
       } else {
@@ -81,7 +89,7 @@ export default function Login() {
 
   const onSignIn = () => {
     if (submitting) return
-    doLogin(email, password)
+    doLogin(email, password, portal)
   }
 
   const onEnter = (e) => {
@@ -145,6 +153,21 @@ export default function Login() {
             <Icon name={showPw ? 'eyeoff' : 'eye'} />
           </button>
         </div>
+      </div>
+      <div className="field">
+        <label htmlFor="l-portal">Portal</label>
+        <select
+          id="l-portal"
+          value={portal}
+          onChange={(e) => setPortal(e.target.value)}
+          disabled={submitting}
+        >
+          {PORTALS.map((p) => (
+            <option key={p.value} value={p.value}>
+              {p.label}
+            </option>
+          ))}
+        </select>
       </div>
       <button
         type="button"

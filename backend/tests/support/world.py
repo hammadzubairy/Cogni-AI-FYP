@@ -436,33 +436,41 @@ async def main(force: bool = False, db_name: str | None = None) -> None:
     dept_id = {old: str(oid) for (old, _, _, _), oid in zip(dept_defs, dept_result.inserted_ids)}
 
     # ---- users -----------------------------------------------------------
+    from app.core.roles import with_roles_fields
+
+    # (old_id, name, email, roles_list, dept_key)
+    # HOD always includes teacher; t2 is teacher+student for multi-role e2e.
     user_defs = [
-        ("a1", "Sadia Rehman", "admin@cogni.pk", "admin", None),
-        ("a2", "Imran Butt", "imran.butt@cogni.pk", "admin", None),
-        ("a3", "IT Support Desk", "it.support@cogni.pk", "admin", None),
-        ("h1", "Prof. Tariq Mehmood", "tariq.mehmood@umt.edu.pk", "hod", "cs"),
-        ("h2", "Dr. Samina Javed", "samina.javed@umt.edu.pk", "hod", "se"),
-        ("h3", "Dr. Kamran Yousaf", "kamran.yousaf@umt.edu.pk", "hod", "dsc"),
-        ("t1", "Dr. Ayesha Khan", "ayesha.khan@umt.edu.pk", "teacher", "cs"),
-        ("t2", "Mr. Faisal Aziz", "faisal.aziz@umt.edu.pk", "teacher", "cs"),
-        ("t3", "Dr. Nida Shah", "nida.shah@umt.edu.pk", "teacher", "se"),
-        ("t4", "Ms. Hira Saleem", "hira.saleem@umt.edu.pk", "teacher", "dsc"),
-        ("s1", "Hamza Ali", "hamza.ali@umt.edu.pk", "student", "cs"),
-        ("s2", "Sana Iqbal", "sana.iqbal@umt.edu.pk", "student", "cs"),
-        ("s3", "Bilal Ahmed", "bilal.ahmed@umt.edu.pk", "student", "cs"),
-        ("s4", "Usman Tariq", "usman.tariq@umt.edu.pk", "student", "cs"),
-        ("s5", "Maryam Noor", "maryam.noor@umt.edu.pk", "student", "cs"),
-        ("s6", "Ali Raza", "ali.raza@umt.edu.pk", "student", "se"),
-        ("s7", "Zainab Fatima", "zainab.fatima@umt.edu.pk", "student", "dsc"),
+        ("a1", "Sadia Rehman", "admin@cogni.pk", ["admin"], None),
+        ("a2", "Imran Butt", "imran.butt@cogni.pk", ["admin"], None),
+        ("a3", "IT Support Desk", "it.support@cogni.pk", ["admin"], None),
+        ("h1", "Prof. Tariq Mehmood", "tariq.mehmood@umt.edu.pk", ["hod", "teacher"], "cs"),
+        ("h2", "Dr. Samina Javed", "samina.javed@umt.edu.pk", ["hod", "teacher"], "se"),
+        ("h3", "Dr. Kamran Yousaf", "kamran.yousaf@umt.edu.pk", ["hod", "teacher"], "dsc"),
+        ("t1", "Dr. Ayesha Khan", "ayesha.khan@umt.edu.pk", ["teacher"], "cs"),
+        ("t2", "Mr. Faisal Aziz", "faisal.aziz@umt.edu.pk", ["teacher", "student"], "cs"),
+        ("t3", "Dr. Nida Shah", "nida.shah@umt.edu.pk", ["teacher"], "se"),
+        ("t4", "Ms. Hira Saleem", "hira.saleem@umt.edu.pk", ["teacher"], "dsc"),
+        ("s1", "Hamza Ali", "hamza.ali@umt.edu.pk", ["student"], "cs"),
+        ("s2", "Sana Iqbal", "sana.iqbal@umt.edu.pk", ["student"], "cs"),
+        ("s3", "Bilal Ahmed", "bilal.ahmed@umt.edu.pk", ["student"], "cs"),
+        ("s4", "Usman Tariq", "usman.tariq@umt.edu.pk", ["student"], "cs"),
+        ("s5", "Maryam Noor", "maryam.noor@umt.edu.pk", ["student"], "cs"),
+        ("s6", "Ali Raza", "ali.raza@umt.edu.pk", ["student"], "se"),
+        ("s7", "Zainab Fatima", "zainab.fatima@umt.edu.pk", ["student"], "dsc"),
     ]
     pw_hash = hash_password(TEST_PASSWORD)
     user_result = await db.users.insert_many(
         [
             {
-                "name": name, "email": email, "password_hash": pw_hash, "role": role,
-                "dept_id": dept_id[dept] if dept else None, "status": "active",
+                "name": name,
+                "email": email,
+                "password_hash": pw_hash,
+                **with_roles_fields(roles),
+                "dept_id": dept_id[dept] if dept else None,
+                "status": "active",
             }
-            for _, name, email, role, dept in user_defs
+            for _, name, email, roles, dept in user_defs
         ]
     )
     user_id = {old: str(oid) for (old, *_), oid in zip(user_defs, user_result.inserted_ids)}

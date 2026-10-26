@@ -11,6 +11,7 @@ from app.schemas.auth import (
     RegisterRequest,
     ResendVerificationRequest,
     ResetRequest,
+    SwitchRoleRequest,
     TokenUser,
     VerifyEmailRequest,
 )
@@ -28,12 +29,34 @@ def _token_user(fields: dict) -> TokenUser:
 async def login(payload: LoginRequest, request: Request):
     check_login_rate_limit(request)
     try:
-        user = await auth_service.authenticate(payload.email, payload.password)
+        user = await auth_service.authenticate(
+            payload.email, payload.password, payload.role
+        )
     except auth_service.AuthError as e:
         raise HTTPException(status_code=e.status_code, detail=e.detail, headers=e.headers or None)
 
-    token, scope = auth_service.issue_tokens_for(user)
-    fields = await auth_service.user_public_fields(user)
+    try:
+        token, scope = auth_service.issue_tokens_for(user, role=payload.role)
+    except auth_service.AuthError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+    fields = await auth_service.user_public_fields(user, active_role=payload.role)
+    return LoginResponse(access_token=token, scope=scope, user=_token_user(fields))
+
+
+@router.post("/switch-role", response_model=LoginResponse)
+async def switch_role(
+    payload: SwitchRoleRequest, current: CurrentUser = Depends(get_current_user)
+):
+    if current.scope == "change_password":
+        raise HTTPException(
+            status_code=403, detail="Change your password before continuing."
+        )
+    user = await auth_service.switch_role(current.id, payload.role)
+    try:
+        token, scope = auth_service.issue_tokens_for(user, role=payload.role)
+    except auth_service.AuthError as e:
+        raise HTTPException(status_code=e.status_code, detail=e.detail)
+    fields = await auth_service.user_public_fields(user, active_role=payload.role)
     return LoginResponse(access_token=token, scope=scope, user=_token_user(fields))
 
 
@@ -46,7 +69,7 @@ async def me(current: CurrentUser = Depends(get_current_user)):
     from app.core.db import get_db, oid
 
     doc = await get_db().users.find_one({"_id": oid(current.id)})
-    fields = await auth_service.user_public_fields(doc)
+    fields = await auth_service.user_public_fields(doc, active_role=current.role)
     return UserOut(**fields)
 
 
@@ -57,8 +80,15 @@ async def change_password(
     user = await auth_service.change_password(
         current.id, payload.current_password, payload.new_password
     )
-    token, scope = auth_service.issue_tokens_for(user)
-    fields = await auth_service.user_public_fields(user)
+    try:
+        token, scope = auth_service.issue_tokens_for(user, role=current.role)
+    except auth_service.AuthError as e:
+        # Portal may have been revoked; fall back to primary role
+        try:
+            token, scope = auth_service.issue_tokens_for(user)
+        except auth_service.AuthError as e2:
+            raise HTTPException(status_code=e2.status_code, detail=e2.detail) from e
+    fields = await auth_service.user_public_fields(user, active_role=current.role)
     return LoginResponse(access_token=token, scope=scope, user=_token_user(fields))
 
 

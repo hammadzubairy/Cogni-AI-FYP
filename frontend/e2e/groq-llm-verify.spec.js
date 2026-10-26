@@ -57,7 +57,7 @@ test.describe('Groq LLM material + generation', () => {
     await snap(page, 'groq-admin-home', 'Admin home (mock banner should be gone if Groq is live)')
 
     const login = await request.post('http://127.0.0.1:8000/api/auth/login', {
-      data: { email: 'admin@cogni.pk', password: WORLD_PASSWORD },
+      data: { email: 'admin@cogni.pk', password: WORLD_PASSWORD , role: 'admin' },
     })
     expect(login.ok()).toBeTruthy()
     const token = (await login.json()).access_token

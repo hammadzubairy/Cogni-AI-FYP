@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import * as api from '../../api'
+import { useAuth } from '../../auth/AuthContext'
+import { redirectIfForbiddenRole } from '../../auth/redirectIfForbiddenRole'
 import { ShellError, ShellLoading } from '../../components/AppShell'
 import { Icon } from '../../components/IconSprite'
 import PageTop from '../../components/PageTop'
@@ -22,6 +24,7 @@ const STATUS_FILTERS = [
  */
 export default function Approvals() {
   const navigate = useNavigate()
+  const { refreshUser } = useAuth()
   const [exams, setExams] = useState([])
   const [classes, setClasses] = useState([])
   const [teachers, setTeachers] = useState([])
@@ -56,12 +59,13 @@ export default function Approvals() {
       )
       setCheckMap(checks)
     } catch (err) {
+      if (await redirectIfForbiddenRole(err, { refreshUser, navigate })) return
       setError(err)
       setExams([])
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [refreshUser, navigate])
 
   useEffect(() => {
     load()

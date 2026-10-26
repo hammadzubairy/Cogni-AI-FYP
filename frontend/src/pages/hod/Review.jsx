@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import * as api from '../../api'
+import { useAuth } from '../../auth/AuthContext'
+import { redirectIfForbiddenRole } from '../../auth/redirectIfForbiddenRole'
 import { ShellError, ShellLoading } from '../../components/AppShell'
 import { useConfirm } from '../../components/ConfirmModal'
 import EmptyState from '../../components/EmptyState'
@@ -68,6 +70,7 @@ export default function Review() {
   const navigate = useNavigate()
   const toast = useToast()
   const confirm = useConfirm()
+  const { refreshUser } = useAuth()
 
   const [exam, setExam] = useState(null)
   const [cls, setCls] = useState(null)
@@ -114,12 +117,13 @@ export default function Review() {
       }
       setCommentErr('')
     } catch (err) {
+      if (await redirectIfForbiddenRole(err, { refreshUser, navigate })) return
       setError(err)
       setExam(null)
     } finally {
       setLoading(false)
     }
-  }, [id])
+  }, [id, refreshUser, navigate])
 
   useEffect(() => {
     load()

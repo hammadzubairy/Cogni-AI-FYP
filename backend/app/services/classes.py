@@ -153,7 +153,9 @@ async def add_student(actor: CurrentUser, class_id: str, email: str) -> dict:
     user = await db.users.find_one({"email": email.strip().lower()})
     if user is None:
         raise HTTPException(status_code=404, detail="No user with that email.")
-    if user["role"] != "student":
+    from app.core.roles import has_role
+
+    if not has_role(user, "student"):
         raise HTTPException(status_code=400, detail=f"{user['name']} is not a student account.")
     student_id = str(user["_id"])
     if student_id in cls.get("student_ids", []):
@@ -215,7 +217,9 @@ async def reassign_teacher(actor: CurrentUser, class_id: str, new_teacher_id: st
     db = get_db()
     cls = await _get_class_or_404(class_id)
     new_teacher = await db.users.find_one({"_id": oid(new_teacher_id)})
-    if new_teacher is None or new_teacher["role"] != "teacher":
+    from app.core.roles import has_role
+
+    if new_teacher is None or not has_role(new_teacher, "teacher"):
         raise HTTPException(status_code=400, detail="Choose an active teacher.")
     if new_teacher.get("dept_id") != cls["dept_id"]:
         raise HTTPException(

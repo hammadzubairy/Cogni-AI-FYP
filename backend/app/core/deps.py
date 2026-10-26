@@ -54,9 +54,14 @@ async def get_current_user(
     if int(doc.get("token_version", 0)) != token_tv:
         raise HTTPException(status_code=401, detail=AUTH_ERROR)
 
-    # Scoped change-password tokens may only hit change-password (enforced in router).
     from app.core.db import oid
+    from app.core.roles import user_roles
     from app.services import settings as settings_service
+
+    jwt_role = payload.get("role")
+    held = user_roles(doc)
+    if jwt_role not in held:
+        raise HTTPException(status_code=401, detail=AUTH_ERROR)
 
     s = await settings_service.get_settings()
     dept_name = None
@@ -72,7 +77,7 @@ async def get_current_user(
         id=str(doc["_id"]),
         name=doc["name"],
         email=doc["email"],
-        role=doc["role"],
+        role=jwt_role,
         dept_id=doc.get("dept_id"),
         status=doc["status"],
         must_change_password=bool(doc.get("must_change_password", False)),

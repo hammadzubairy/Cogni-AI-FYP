@@ -233,7 +233,7 @@ test.describe('errors/ folder — verify fixes', () => {
   test('E6 score save does not full-page reload', async ({ page, request }) => {
     // Resolve a seeded submitted attempt via API, then open review UI
     const login = await request.post('http://127.0.0.1:8000/api/auth/login', {
-      data: { email: 'ayesha.khan@umt.edu.pk', password: 'Test-Passw0rd!' },
+      data: { email: 'ayesha.khan@umt.edu.pk', password: 'Test-Passw0rd!' , role: 'teacher' },
     })
     expect(login.ok()).toBeTruthy()
     const token = (await login.json()).access_token

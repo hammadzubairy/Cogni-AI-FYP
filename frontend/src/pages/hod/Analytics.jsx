@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import * as api from '../../api'
 import { useAuth } from '../../auth/AuthContext'
+import { redirectIfForbiddenRole } from '../../auth/redirectIfForbiddenRole'
 import { ShellError, ShellLoading } from '../../components/AppShell'
 import EmptyState from '../../components/EmptyState'
 import PageTop from '../../components/PageTop'
@@ -14,7 +16,8 @@ import DeptTabs from './DeptTabs'
  * Department analytics (v7 `P['h-analytics']`). Plain CSS bars via ScoreBar.
  */
 export default function Analytics() {
-  const { user } = useAuth()
+  const { user, refreshUser } = useAuth()
+  const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [deptName, setDeptName] = useState('Department')
   const [loading, setLoading] = useState(true)
@@ -28,12 +31,13 @@ export default function Analytics() {
       setData(analytics)
       if (user?.dept_name) setDeptName(user.dept_name)
     } catch (err) {
+      if (await redirectIfForbiddenRole(err, { refreshUser, navigate })) return
       setError(err)
       setData(null)
     } finally {
       setLoading(false)
     }
-  }, [user?.id, user?.email])
+  }, [user?.id, user?.email, user?.dept_name, refreshUser, navigate])
 
   useEffect(() => {
     load()

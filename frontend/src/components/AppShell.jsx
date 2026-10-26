@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import * as api from '../api'
-import { useAuth } from '../auth/AuthContext'
+import { ROLE_HOME, useAuth } from '../auth/AuthContext'
 import useCounts from '../hooks/useCounts'
 import useNotifications from '../hooks/useNotifications'
 import { formatShortDate, initials } from '../utils/format'
@@ -59,7 +59,7 @@ function NotificationDrawer({ open, items, unread, loading, error, onMarkAll, on
  * sidebar, optional admin LLM warning, topnav (bell + account), main, mobile scrim.
  */
 export default function AppShell({ children }) {
-  const { user, logout } = useAuth()
+  const { user, logout, switchRole } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const toast = useToast()
@@ -68,11 +68,13 @@ export default function AppShell({ children }) {
   const R = ROLE[role] || ROLE.admin
   const { counts, refresh: refreshCounts } = useCounts(role)
   const notes = useNotifications(!!user)
+  const otherPortals = (user?.roles || []).filter((r) => r && r !== role)
 
   const [navOpen, setNavOpen] = useState(false)
   const [bellOpen, setBellOpen] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [llmStatus, setLlmStatus] = useState(null)
+  const [switching, setSwitching] = useState(false)
 
   const bellWrap = useRef(null)
   const menuWrap = useRef(null)
@@ -340,6 +342,40 @@ export default function AppShell({ children }) {
                       {user.dept_name ? ` · ${user.dept_name}` : ''}
                     </div>
                   </div>
+                  {otherPortals.length ? (
+                    <div className="sec" aria-label="Switch portal">
+                      <div className="small" style={{ marginBottom: 6 }}>
+                        Switch portal
+                      </div>
+                      {otherPortals.map((r) => (
+                        <button
+                          key={r}
+                          type="button"
+                          className="menu-item"
+                          disabled={switching}
+                          onClick={async () => {
+                            setSwitching(true)
+                            try {
+                              const u = await switchRole(r)
+                              setMenuOpen(false)
+                              navigate(ROLE_HOME[u.role] || ROLE_HOME[r] || '/', {
+                                replace: true,
+                              })
+                            } catch (err) {
+                              toast(err?.message || 'Could not switch portal.', {
+                                type: 'error',
+                              })
+                            } finally {
+                              setSwitching(false)
+                            }
+                          }}
+                        >
+                          <Icon name="swap" />
+                          {ROLE[r]?.name || r}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
                   <button type="button" className="menu-item danger" onClick={onSignOut}>
                     <Icon name="out" />
                     Sign out

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import * as api from '../../api'
 import { useAuth } from '../../auth/AuthContext'
+import { redirectIfForbiddenRole } from '../../auth/redirectIfForbiddenRole'
 import { ShellError, ShellLoading } from '../../components/AppShell'
 import Field from '../../components/Field'
 import { Icon } from '../../components/IconSprite'
@@ -15,7 +17,8 @@ import DeptTabs from './DeptTabs'
  */
 export default function Policy() {
   const toast = useToast()
-  const { user } = useAuth()
+  const navigate = useNavigate()
+  const { user, refreshUser } = useAuth()
   const [policy, setPolicy] = useState(null)
   const [settings, setSettings] = useState(null)
   const [deptName, setDeptName] = useState('your department')
@@ -41,12 +44,13 @@ export default function Policy() {
       setSettings(st)
       if (user?.dept_name) setDeptName(user.dept_name)
     } catch (err) {
+      if (await redirectIfForbiddenRole(err, { refreshUser, navigate })) return
       setError(err)
       setPolicy(null)
     } finally {
       setLoading(false)
     }
-  }, [user?.id, user?.email])
+  }, [user?.id, user?.email, user?.dept_name, refreshUser, navigate])
 
   useEffect(() => {
     load()

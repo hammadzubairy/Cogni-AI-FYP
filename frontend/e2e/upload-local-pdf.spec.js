@@ -42,7 +42,7 @@ test.describe('Local lecture PDF upload → Mongo', () => {
 
     // Confirm via API that Mongo-backed list contains the file
     const login = await request.post('http://127.0.0.1:8000/api/auth/login', {
-      data: { email: 'ayesha.khan@umt.edu.pk', password: 'Test-Passw0rd!' },
+      data: { email: 'ayesha.khan@umt.edu.pk', password: 'Test-Passw0rd!' , role: 'teacher' },
     })
     const token = (await login.json()).access_token
     const classes = await request.get('http://127.0.0.1:8000/api/classes', {
