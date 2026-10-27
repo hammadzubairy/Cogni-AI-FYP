@@ -76,3 +76,20 @@ def render_notification_email(text: str, link: str | None) -> tuple[str, str]:
         "activity on your Cogni.ai account.</p></div>"
     )
     return plain, html
+
+
+def render_action_email(intro: str, link: str, button: str, minutes: int) -> tuple[str, str]:
+    """Plain + HTML bodies for an account email (verify / reset) with one link."""
+    note = "If you did not request this, you can ignore this email; nothing will change."
+    plain = f"{intro}\n\n{button}: {link}\n\nThis link expires in {minutes} minutes.\n{note}\n"
+    html = (
+        '<div style="font-family:Arial,sans-serif;max-width:520px;margin:auto">'
+        '<h2 style="color:#4f46e5">Cogni.ai</h2>'
+        f"<p>{escape(intro)}</p>"
+        f'<p><a href="{escape(link, quote=True)}" style="display:inline-block;padding:10px 18px;'
+        f'background:#4f46e5;color:#fff;border-radius:6px;text-decoration:none">{escape(button)}</a></p>'
+        f'<p style="color:#555;font-size:13px">Or copy this address into your browser:<br>{escape(link)}</p>'
+        f'<p style="color:#888;font-size:12px">This link expires in {minutes} minutes. {escape(note)}</p>'
+        "</div>"
+    )
+    return plain, html

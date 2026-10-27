@@ -12,7 +12,7 @@ from app.core.security import (
     verify_password,
 )
 from app.services import settings as settings_service
-from app.services.mailer import get_mailer, smtp_configured
+from app.services.mailer import get_mailer, render_action_email, smtp_configured
 from app.services.notify import log_activity
 from app.services.passwords import generate_temporary_password, hash_reset_token, validate_password
 
@@ -206,12 +206,14 @@ async def _issue_email_verification(user: dict) -> str:
         }
     )
     link = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/verify/{raw}"
-    body = (
-        f"Verify your Cogni.ai email using this link (expires in "
-        f"{settings.EMAIL_VERIFY_MINUTES} minutes):\n\n{link}\n"
+    body, html = render_action_email(
+        "Confirm your email address to finish creating your Cogni.ai account.",
+        link,
+        "Verify my email",
+        settings.EMAIL_VERIFY_MINUTES,
     )
     # Always send via mailer (ConsoleMailer in test/dev when SMTP unset).
-    get_mailer().send(user["email"], "Verify your Cogni.ai email", body)
+    get_mailer().send(user["email"], "Verify your Cogni.ai email", body, html)
     return raw
 
 
@@ -322,13 +324,15 @@ async def forgot_password(email: str) -> None:
         }
     )
     link = f"{settings.PUBLIC_BASE_URL.rstrip('/')}/reset/{raw}"
-    body = (
-        f"Reset your Cogni.ai password using this link (expires in "
-        f"{settings.PASSWORD_RESET_MINUTES} minutes):\n\n{link}\n"
+    body, html = render_action_email(
+        "We received a request to reset your Cogni.ai password.",
+        link,
+        "Reset my password",
+        settings.PASSWORD_RESET_MINUTES,
     )
     if settings.is_production and not smtp_configured():
         return
-    get_mailer().send(email_n, "Reset your Cogni.ai password", body)
+    get_mailer().send(email_n, "Reset your Cogni.ai password", body, html)
 
 
 async def reset_password_with_token(token: str, new_password: str) -> None:

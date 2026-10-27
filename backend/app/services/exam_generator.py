@@ -101,6 +101,42 @@ def validate_question(q: dict) -> str | None:
     return None
 
 
+def plan_marks(
+    questions: list[dict],
+    *,
+    mode: str = "suggested",
+    per_type: dict[str, float] | None = None,
+    total: float | None = None,
+) -> None:
+    """Set `marks` on each question in place. "suggested" uses per-type marks;
+    "total" spreads `total` over the questions (weights follow the default
+    per-type marks, rounded to 0.5, summing to exactly `total`)."""
+    if not questions:
+        return
+    per_type = per_type or MARKS_BY_TYPE
+    if mode != "total" or not total:
+        for q in questions:
+            q["marks"] = per_type.get(q["type"], MARKS_BY_TYPE[q["type"]])
+        return
+    step = 0.5
+    units = round(total / step)
+    n = len(questions)
+    if units < n:
+        raise ValueError("Total marks must allow at least 0.5 marks per question.")
+    weights = [MARKS_BY_TYPE[q["type"]] for q in questions]
+    wsum = sum(weights)
+    # Every question gets one unit, the rest is shared by weight (largest remainder).
+    spare = units - n
+    raw = [spare * w / wsum for w in weights]
+    alloc = [int(r) for r in raw]
+    leftover = spare - sum(alloc)
+    order = sorted(range(n), key=lambda i: raw[i] - alloc[i], reverse=True)
+    for i in order[:leftover]:
+        alloc[i] += 1
+    for q, extra in zip(questions, alloc):
+        q["marks"] = (1 + extra) * step
+
+
 def finalize_question(raw: dict) -> dict:
     """Assign qid/marks and normalize optional fields on an already-valid
     question dict returned by the LLM."""

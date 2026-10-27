@@ -121,14 +121,14 @@ export default function QuestionCard({
     const t = String(draftText || '').trim()
     if (!t) errs.text = "The question can't be empty"
     const m = Number(draftMarks)
-    if (!(m >= 1)) errs.marks = 'Marks must be at least 1'
+    if (!(m >= 0.5 && m <= 100)) errs.marks = 'Marks must be between 0.5 and 100'
     if (Object.keys(errs).length) {
       setFieldErrors(errs)
       return
     }
     next.text = t
     next.bloom = draftBloom
-    next.marks = Math.max(1, m)
+    next.marks = m
     if (type === 'MCQ') {
       next.options = draftOpts.map((o, i) => String(o || '').trim() || opts[i] || `Option ${'ABCD'[i]}`)
       next.answer_index = Number(draftAns)
@@ -235,8 +235,9 @@ export default function QuestionCard({
             <input
               id={`e-marks-${qid}`}
               type="number"
-              min={1}
-              max={50}
+              min={0.5}
+              max={100}
+              step={0.5}
               value={draftMarks}
               onChange={(e) => setDraftMarks(e.target.value)}
               disabled={saving}

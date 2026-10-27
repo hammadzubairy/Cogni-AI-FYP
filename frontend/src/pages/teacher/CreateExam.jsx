@@ -58,6 +58,11 @@ export default function CreateExam() {
   const [mcq, setMcq] = useState(4)
   const [short, setShort] = useState(2)
   const [essay, setEssay] = useState(1)
+  const [marksMode, setMarksMode] = useState('suggested')
+  const [mMcq, setMMcq] = useState(2)
+  const [mShort, setMShort] = useState(5)
+  const [mEssay, setMEssay] = useState(10)
+  const [totalMarks, setTotalMarks] = useState(50)
   const [linkedReq, setLinkedReq] = useState(reqId || '')
   const [fieldErrors, setFieldErrors] = useState({})
   const [warnings, setWarnings] = useState([])
@@ -135,6 +140,10 @@ export default function CreateExam() {
   )
 
   const totalQ = (Number(mcq) || 0) + (Number(short) || 0) + (Number(essay) || 0)
+  const suggestedTotal =
+    (Number(mcq) || 0) * (Number(mMcq) || 0) +
+    (Number(short) || 0) * (Number(mShort) || 0) +
+    (Number(essay) || 0) * (Number(mEssay) || 0)
 
   async function onClassChange(id) {
     setClassId(id)
@@ -180,6 +189,17 @@ export default function CreateExam() {
     if (totalQ < 1) errs.mcq = 'Choose at least one question of any type'
     if (totalQ > QUESTION_CAP) errs.mcq = `Total questions cannot exceed ${QUESTION_CAP}`
     if (!title.trim()) errs.title = 'Enter a title'
+    if (marksMode === 'total') {
+      const t = Number(totalMarks)
+      if (!(t > 0)) errs.marks = 'Enter the total marks for the paper'
+      else if (t > 1000) errs.marks = 'Total marks cannot exceed 1000'
+      else if (t < totalQ * 0.5) errs.marks = `Total marks must be at least ${totalQ * 0.5} for ${totalQ} questions`
+    } else {
+      for (const v of [mMcq, mShort, mEssay]) {
+        const n = Number(v)
+        if (!(n >= 0.5 && n <= 100)) errs.marks = 'Marks per question must be between 0.5 and 100'
+      }
+    }
     setFieldErrors(errs)
     return Object.keys(errs).length === 0
   }
@@ -200,6 +220,12 @@ export default function CreateExam() {
         Short: Number(short) || 0,
         Essay: Number(essay) || 0,
       },
+      marks_mode: marksMode,
+    }
+    if (marksMode === 'total') {
+      body.total_marks = Number(totalMarks)
+    } else {
+      body.marks_per_type = { MCQ: Number(mMcq), Short: Number(mShort), Essay: Number(mEssay) }
     }
     if (linkedReq) body.request_id = linkedReq
     setBusy(true)
@@ -469,6 +495,59 @@ export default function CreateExam() {
             <p className="small" style={{ margin: '0 0 12px' }}>
               Total: {totalQ} / {QUESTION_CAP}
             </p>
+
+            <h3 style={{ fontSize: 15.5, margin: '4px 0' }}>Marks</h3>
+            <p className="small" style={{ margin: '0 0 10px' }}>
+              Start from the suggested marks, or give the total for the paper and we will spread it across
+              the questions. You can still change marks on any question in the editor.
+            </p>
+            <div className="row" style={{ marginBottom: 10 }}>
+              <label className="small" style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                <input
+                  type="radio"
+                  name="cf-marks-mode"
+                  checked={marksMode === 'suggested'}
+                  disabled={busy}
+                  onChange={() => setMarksMode('suggested')}
+                />
+                AI suggests (editable)
+              </label>
+              <label className="small" style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
+                <input
+                  type="radio"
+                  name="cf-marks-mode"
+                  checked={marksMode === 'total'}
+                  disabled={busy}
+                  onChange={() => setMarksMode('total')}
+                />
+                I set the total marks
+              </label>
+            </div>
+            {marksMode === 'suggested' ? (
+              <>
+                <div className="grid g3" style={{ alignItems: 'end' }}>
+                  <Field id="cf-m-mcq" label="Marks per MCQ" error={fieldErrors.marks}>
+                    <input id="cf-m-mcq" type="number" min={0.5} max={100} step={0.5} value={mMcq} disabled={busy} onChange={(e) => setMMcq(e.target.value)} />
+                  </Field>
+                  <Field id="cf-m-short" label="Marks per Short">
+                    <input id="cf-m-short" type="number" min={0.5} max={100} step={0.5} value={mShort} disabled={busy} onChange={(e) => setMShort(e.target.value)} />
+                  </Field>
+                  <Field id="cf-m-essay" label="Marks per Essay">
+                    <input id="cf-m-essay" type="number" min={0.5} max={100} step={0.5} value={mEssay} disabled={busy} onChange={(e) => setMEssay(e.target.value)} />
+                  </Field>
+                </div>
+                <p className="small" style={{ margin: '0 0 12px' }}>Paper total: {suggestedTotal} marks</p>
+              </>
+            ) : (
+              <>
+                <Field id="cf-total-marks" label="Total marks for the paper" error={fieldErrors.marks}>
+                  <input id="cf-total-marks" type="number" min={1} max={1000} step={0.5} value={totalMarks} disabled={busy} onChange={(e) => setTotalMarks(e.target.value)} />
+                </Field>
+                <p className="small" style={{ margin: '0 0 12px' }}>
+                  Longer question types get more of the {Number(totalMarks) || 0} marks. The paper adds up to exactly this total.
+                </p>
+              </>
+            )}
 
             {openReqsForClass.length ? (
               <Field id="cf-req" label="Link to HOD request (optional)">

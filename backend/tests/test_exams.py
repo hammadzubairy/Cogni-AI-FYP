@@ -264,3 +264,63 @@ def test_hod_sees_dept_exams_admin_sees_all(client):
     admin_resp = client.get("/api/exams", headers=_auth(client, ADMIN))
     assert admin_resp.status_code == 200
     assert len(admin_resp.json()) >= len(hod_resp.json())
+
+
+def test_generate_total_marks_mode_sums_exactly(client):
+    c1_id = _class_id(client, "CS-201-A", TEACHER_A)
+    material_id = _first_material_id(client, c1_id, TEACHER_A)
+    resp = _generate(
+        client, TEACHER_A, class_id=c1_id, material_id=material_id,
+        counts={"MCQ": 3, "Short": 2, "Essay": 1},
+        marks_mode="total", total_marks=47,
+    )
+    assert resp.status_code == 201
+    questions = resp.json()["exam"]["questions"]
+    assert sum(q["marks"] for q in questions) == 47
+
+
+def test_generate_custom_per_type_marks(client):
+    c1_id = _class_id(client, "CS-201-A", TEACHER_A)
+    material_id = _first_material_id(client, c1_id, TEACHER_A)
+    resp = _generate(
+        client, TEACHER_A, class_id=c1_id, material_id=material_id,
+        counts={"MCQ": 2, "Short": 1, "Essay": 0},
+        marks_mode="suggested", marks_per_type={"MCQ": 1, "Short": 4, "Essay": 8},
+    )
+    assert resp.status_code == 201
+    for q in resp.json()["exam"]["questions"]:
+        assert q["marks"] == (1 if q["type"] == "MCQ" else 4)
+
+
+def test_generate_total_marks_validation(client):
+    c1_id = _class_id(client, "CS-201-A", TEACHER_A)
+    material_id = _first_material_id(client, c1_id, TEACHER_A)
+    too_small = _generate(
+        client, TEACHER_A, class_id=c1_id, material_id=material_id,
+        counts={"MCQ": 4, "Short": 0, "Essay": 0}, marks_mode="total", total_marks=1,
+    )
+    assert too_small.status_code == 400
+    negative = _generate(
+        client, TEACHER_A, class_id=c1_id, material_id=material_id,
+        counts={"MCQ": 1, "Short": 0, "Essay": 0}, marks_mode="total", total_marks=-5,
+    )
+    assert negative.status_code == 400  # app maps validation errors to 400
+
+
+def test_patch_marks_validated_and_kept_on_regenerate(client):
+    c1_id = _class_id(client, "CS-201-A", TEACHER_A)
+    material_id = _first_material_id(client, c1_id, TEACHER_A)
+    exam = _generate(
+        client, TEACHER_A, class_id=c1_id, material_id=material_id,
+        counts={"MCQ": 1, "Short": 0, "Essay": 0},
+    ).json()["exam"]
+    qid = exam["questions"][0]["qid"]
+    url = f"/api/exams/{exam['id']}/questions/{qid}"
+    headers = _auth(client, TEACHER_A)
+    assert client.patch(url, json={"marks": 0}, headers=headers).status_code == 400
+    assert client.patch(url, json={"marks": 500}, headers=headers).status_code == 400
+    ok = client.patch(url, json={"marks": 3.5}, headers=headers)
+    assert ok.status_code == 200
+    regen = client.post(f"{url}/regenerate", headers=headers)
+    assert regen.status_code == 200
+    assert regen.json()["questions"][0]["marks"] == 3.5

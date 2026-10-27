@@ -60,6 +60,12 @@ class GenerateCounts(BaseModel):
     Essay: int = 0
 
 
+class MarksPerType(BaseModel):
+    MCQ: float = Field(default=2, ge=0.5, le=100)
+    Short: float = Field(default=5, ge=0.5, le=100)
+    Essay: float = Field(default=10, ge=0.5, le=100)
+
+
 class ExamGenerateRequest(BaseModel):
     class_id: str
     title: str
@@ -68,6 +74,11 @@ class ExamGenerateRequest(BaseModel):
     material_ids: list[str]
     counts: GenerateCounts
     request_id: str | None = None
+    # "suggested": per-type marks (defaults 2/5/10, teacher may edit).
+    # "total": spread total_marks across the questions.
+    marks_mode: Literal["suggested", "total"] = "suggested"
+    marks_per_type: MarksPerType = Field(default_factory=MarksPerType)
+    total_marks: float | None = Field(default=None, gt=0, le=1000)
 
 
 class ExamGenerateResponse(BaseModel):
@@ -87,7 +98,7 @@ class QuestionPatch(BaseModel):
     answer_index: int | None = None
     model_answer: str | None = None
     bloom: Bloom | None = None
-    marks: float | None = None
+    marks: float | None = Field(default=None, gt=0, le=100)
 
 
 class QuestionCreateRequest(BaseModel):

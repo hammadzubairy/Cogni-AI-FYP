@@ -8,6 +8,7 @@ from app.services import settings as settings_service
 from app.services.exam_generator import (
     MAX_TOTAL_QUESTIONS,
     generate_questions,
+    plan_marks,
     regenerate_one,
 )
 from app.services.grading import finalize_attempt
@@ -241,6 +242,15 @@ async def generate_exam(actor: CurrentUser, payload) -> tuple[dict, list[str]]:
             status_code=400,
             detail="The AI could not generate any valid questions from this material.",
         )
+    try:
+        plan_marks(
+            questions,
+            mode=payload.marks_mode,
+            per_type=payload.marks_per_type.model_dump(),
+            total=payload.total_marks,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     settings_doc = await settings_service.get_settings()
     ai_threshold = settings_doc.get("ai_threshold_default", 70)
@@ -360,6 +370,7 @@ async def regenerate_question(actor: CurrentUser, exam_id: str, qid: str) -> dic
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    new_q["marks"] = old.get("marks", new_q["marks"])
     questions[idx] = new_q
     db = get_db()
     await db.exams.update_one({"_id": exam["_id"]}, {"$set": {"questions": questions}})
@@ -383,6 +394,9 @@ async def add_question(actor: CurrentUser, exam_id: str, qtype: str) -> tuple[di
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
+    same_type = [q["marks"] for q in exam["questions"] if q["type"] == qtype and "marks" in q]
+    if same_type:
+        new_q["marks"] = max(set(same_type), key=same_type.count)
     questions = exam["questions"] + [new_q]
     db = get_db()
     await db.exams.update_one({"_id": exam["_id"]}, {"$set": {"questions": questions}})
