@@ -31,6 +31,8 @@ A MongoDB server must be reachable at `MONGO_URI` (defaults to
 | `LLM_BASE_URL` | | Optional, OpenAI-compatible providers only. |
 | `AI_DETECTOR` | `heuristic` | `heuristic` \| `gptzero`. GPTZero needs `GPTZERO_API_KEY` and falls back to heuristic if the key is missing or the API fails. |
 | `GPTZERO_API_KEY` | | Optional. Free-tier key from GPTZero when `AI_DETECTOR=gptzero`. |
+| `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASSWORD` / `SMTP_FROM` | | Outbound mail for verification, password reset and notifications. Brevo: host `smtp-relay.brevo.com`, port `587`, user = SMTP login, password = SMTP key, `SMTP_FROM` must be a sender verified in Brevo (free tier: 300 emails/day). Empty host prints mail to the console. |
+| `NOTIFY_EMAIL_ENABLED` | `false` | Also email every in-app notification to its recipient. Needs `SMTP_HOST`. |
 | `CORS_ORIGINS` | `http://localhost:5173` | Comma-separated list; the frontend origin(s) allowed to call the API. |
 | `MAX_UPLOAD_MB` | `25` | Default material-upload cap; overridable at runtime via `PUT /api/admin/settings`. |
 | `MAX_REQUEST_MB` | `50` | Hard ceiling on any request body (defence in depth, checked before the body is read). Keep this at or above `MAX_UPLOAD_MB`. |

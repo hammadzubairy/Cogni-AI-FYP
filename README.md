@@ -115,8 +115,16 @@ Use **two Vercel projects** from the same GitHub repo (recommended).
 | `LLM_API_KEY` | your OpenRouter key |
 | `CORS_ORIGINS` | frontend URL (set after step C) |
 | `PUBLIC_BASE_URL` | frontend URL |
+| `SMTP_HOST` | `smtp-relay.brevo.com` |
+| `SMTP_PORT` | `587` |
+| `SMTP_USER` | Brevo SMTP login |
+| `SMTP_PASSWORD` | Brevo SMTP key |
+| `SMTP_FROM` | sender verified in Brevo |
+| `NOTIFY_EMAIL_ENABLED` | `true` to email notifications |
 
 5. Deploy → open `https://<backend>.vercel.app/api/health` → `{"status":"ok"}`.
+
+Brevo blocks SMTP from unknown IPs and Vercel IPs change: in Brevo go to Settings → Security → Authorized IPs and deactivate blocking, or sends fail with `525 Unauthorized IP`.
 
 `backend/vercel.json` sets `maxDuration` to 60s for exam generation.
 

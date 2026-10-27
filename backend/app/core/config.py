@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM: str = ""
     SMTP_STARTTLS: bool = True
+    NOTIFY_EMAIL_ENABLED: bool = False
     PUBLIC_BASE_URL: str = "http://localhost:5173"
     PASSWORD_RESET_MINUTES: int = 30
     EMAIL_VERIFY_MINUTES: int = 60
@@ -70,6 +71,10 @@ def assert_production_safe() -> None:
     if "*" in settings.cors_origins_list:
         raise RuntimeError(
             "CORS_ORIGINS must not contain '*' when APP_ENV=production."
+        )
+    if settings.NOTIFY_EMAIL_ENABLED and not settings.SMTP_HOST.strip():
+        raise RuntimeError(
+            "NOTIFY_EMAIL_ENABLED requires SMTP_HOST when APP_ENV=production."
         )
     db = settings.MONGO_DB.strip().lower()
     if db.endswith(("_dev", "_demo", "_test")):

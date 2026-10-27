@@ -1,8 +1,42 @@
+import asyncio
+import logging
 from collections.abc import Iterable
 from datetime import UTC, datetime
 
+from bson import ObjectId
+from bson.errors import InvalidId
+
+from app.core.config import settings
 from app.core.db import get_db
 from app.core.deps import CurrentUser
+from app.services import mailer
+
+logger = logging.getLogger("app.notify")
+
+
+async def _email_recipients(user_ids: list[str], text: str) -> None:
+    """Best-effort email copy of a notification. Never raises."""
+    try:
+        oids = []
+        for uid in user_ids:
+            try:
+                oids.append(ObjectId(uid))
+            except (InvalidId, TypeError):
+                continue
+        users = await get_db().users.find({"_id": {"$in": oids}}, {"email": 1}).to_list(None)
+        plain, html = mailer.render_notification_email(text, settings.PUBLIC_BASE_URL)
+        sender = mailer.get_mailer()
+
+        async def _send(email: str) -> None:
+            try:
+                await sender.send_async(email, "Cogni.ai notification", plain, html)
+            except Exception:
+                logger.exception("notification email failed")
+
+        emails = [(u.get("email") or "").strip() for u in users]
+        await asyncio.gather(*(_send(e) for e in emails if e))
+    except Exception:
+        logger.exception("notification email batch failed")
 
 
 async def notify(
@@ -28,6 +62,10 @@ async def notify(
             for uid in ids
         ]
     )
+    if settings.NOTIFY_EMAIL_ENABLED and mailer.smtp_configured():
+        # Awaited (not a background task): serverless hosts like Vercel can
+        # freeze the process once the response is sent. Never raises.
+        await _email_recipients(sorted(ids), text)
 
 
 async def log_activity(
