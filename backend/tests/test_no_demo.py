@@ -33,6 +33,7 @@ ALLOW_PATH_PARTS = (
     "REAL_WORKFLOW_REPORT",
     "REAL_WORKFLOW.md",
     "docs/test/",
+    "docs/fr-proof/",
     "/reference/",
     "test-results",
     "playwright-report",

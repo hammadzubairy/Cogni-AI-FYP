@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.core.config import settings
 from app.main import app
+from app.services.study_assistant import TOP_K
 from tests.helpers import WORLD_PASSWORD, portal_for
 
 TEST_DB = os.environ.get("TEST_MONGO_DB", "cogni_test_dev")
@@ -38,7 +39,7 @@ def test_student_gets_answer_from_top_matching_chunk(client):
     assert resp.status_code == 200
     body = resp.json()
     assert body["answer"]
-    assert 1 <= len(body["sources"]) <= 3
+    assert 1 <= len(body["sources"]) <= TOP_K
     assert all("page" in s and "heading" in s for s in body["sources"])
 
 

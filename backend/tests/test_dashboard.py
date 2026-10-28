@@ -74,7 +74,8 @@ def test_hod_analytics_covers_every_class_in_department(client):
         "CS-310-A",
     }
     teacher_names = {row["teacher_name"] for row in body["teacher_activity"]}
-    assert teacher_names == {"Dr. Ayesha Khan", "Mr. Faisal Aziz"}
+    # The HOD also holds the teacher role in the seeded world.
+    assert teacher_names == {"Dr. Ayesha Khan", "Mr. Faisal Aziz", "Prof. Tariq Mehmood"}
 
 
 def test_hod_analytics_forbidden_for_teacher(client):

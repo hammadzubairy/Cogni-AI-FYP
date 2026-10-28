@@ -81,12 +81,30 @@ def _pack_blocks(blocks: list[tuple]) -> list[dict]:
     for page, heading, para in blocks:
         if cur_words >= MIN_WORDS:
             flush()
+        words = para.split()
+        # An unbroken run too long to share a chunk (e.g. text with no sentence
+        # punctuation) is split so chunks stay near MAX_WORDS.
+        while cur_words + len(words) > MAX_WORDS * 1.2:
+            room = MAX_WORDS - cur_words
+            if room <= 0:
+                flush()
+                continue
+            if not cur_paras:
+                cur_heading = heading
+                cur_page_start = page
+            cur_page_end = page
+            cur_paras.append(" ".join(words[:room]))
+            cur_words += room
+            words = words[room:]
+            flush()
+        if not words:
+            continue
         if not cur_paras:
             cur_heading = heading
             cur_page_start = page
         cur_page_end = page
-        cur_paras.append(para)
-        cur_words += len(para.split())
+        cur_paras.append(para if cur_words == 0 and len(words) == len(para.split()) else " ".join(words))
+        cur_words += len(words)
 
     flush()
     return chunks

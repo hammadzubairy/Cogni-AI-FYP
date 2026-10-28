@@ -85,10 +85,11 @@ def test_add_student_rejects_already_enrolled(client):
 
 
 def test_add_student_rejects_non_student_account(client):
+    # Admin has no student role. (TEACHER_B also holds the student role in the seeded world.)
     c1_id = _class_id(client, "CS-201-A", TEACHER_A)
     resp = client.post(
         f"/api/classes/{c1_id}/students",
-        json={"email": TEACHER_B},
+        json={"email": "admin@cogni.pk"},
         headers=_auth(client, TEACHER_A),
     )
     assert resp.status_code == 400

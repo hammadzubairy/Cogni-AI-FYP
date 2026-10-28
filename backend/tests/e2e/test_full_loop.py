@@ -67,7 +67,7 @@ def test_full_demo_loop(client):
         assert changed.status_code == 200, changed.text
         return user["id"], user["email"]
 
-    hod_id, hod_email = _staff(f"QA HOD {tag}", f"qa.hod.{tag}@umt.edu.pk")
+    hod_id, hod_email = _staff(f"QA HOD {tag}", f"qa.hod.{tag}@umt.edu.pk", role="hod")
     teacher_id, teacher_email = _staff(f"QA Teacher {tag}", f"qa.teacher.{tag}@umt.edu.pk")
 
     patched = client.patch(

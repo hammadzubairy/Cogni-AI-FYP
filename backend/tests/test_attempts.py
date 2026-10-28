@@ -325,8 +325,11 @@ async def test_llm_score_and_labels_are_clamped_and_validated():
     result = await grading_service._grade_written_llm(
         llm, question, "a answer covering M thoroughly", detector
     )
-    assert result["score"] == 5.0  # LLM score clamped; blend still full marks
+    # LLM score 999 is clamped to full rubric marks; keywords fully hit. The blend then
+    # depends only on the (embedding-backend dependent) similarity, which is capped at 100.
     assert 0 <= result["similarity"] <= 100  # embedding similarity, not LLM's 150
+    assert result["score"] == grading_service._blend_score(5, result["similarity"], 100.0, 100.0)
+    assert result["score"] <= question["marks"]
     assert result["key_points_hit"] == ["A"]  # labels not in the question are dropped
     assert result["key_points_missed"] == []
     assert result["fallback"] is False
