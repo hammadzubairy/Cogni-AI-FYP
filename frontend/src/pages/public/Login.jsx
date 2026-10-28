@@ -178,14 +178,9 @@ export default function Login() {
       >
         {submitting ? 'Signing in…' : 'Sign in'}
       </button>
-      <p className="small" style={{ margin: '14px 0 0', textAlign: 'center' }}>
+      <p className="small auth-links">
         <Link to="/forgot">Forgot password?</Link>
-        {signupEnabled ? (
-          <>
-            {' '}
-            · <Link to="/register">Create student account</Link>
-          </>
-        ) : null}
+        {signupEnabled ? <Link to="/register">Create student account</Link> : null}
       </p>
       {notice && error && error.toLowerCase().includes('verify your email') ? (
         <button

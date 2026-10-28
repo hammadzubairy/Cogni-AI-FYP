@@ -6,6 +6,7 @@ from app.core.deps import CurrentUser
 from app.services import classes as class_service
 from app.services.attempts import auto_close_if_expired
 from app.services.exams import get_checks
+from app.services.exam_generator import is_mcq
 from app.services.grading import effective_score, effective_total
 
 RECENT_LIMIT = 5
@@ -70,7 +71,7 @@ async def teacher_dashboard(teacher: CurrentUser) -> dict:
         for attempt in attempts:
             exam = exam_by_id[attempt["exam_id"]]
             for q in exam["questions"]:
-                if q["type"] == "MCQ":
+                if is_mcq(q):
                     continue
                 result = attempt.get("results", {}).get(q["qid"])
                 if not result or result.get("ai_probability") is None:
@@ -345,7 +346,7 @@ async def hod_analytics(hod: CurrentUser) -> dict:
         for exam in teacher_exams:
             for attempt in attempts_by_exam.get(str(exam["_id"]), []):
                 for q in exam["questions"]:
-                    if q["type"] == "MCQ":
+                    if is_mcq(q):
                         continue
                     result = attempt.get("results", {}).get(q["qid"])
                     if not result or result.get("ai_probability") is None:

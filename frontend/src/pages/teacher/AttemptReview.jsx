@@ -1,3 +1,4 @@
+import { isMcqQuestion } from '../../utils/teacher'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import * as api from '../../api'
@@ -183,7 +184,7 @@ export default function AttemptReview() {
           const dec = q.flag_decision
           const ai = r.ai_probability
           const kc = keyConceptFraction(r)
-          const isMcq = q.type === 'MCQ'
+          const isMcq = isMcqQuestion(q)
           const autoScore = r.score
 
           return (

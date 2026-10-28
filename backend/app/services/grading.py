@@ -198,7 +198,13 @@ def _keyword_fallback(question: dict, answer: str) -> dict:
     model_answer = question.get("model_answer") or ""
     key_pct = coverage * 100
     sim_pct = cosine_similarity_percent(answer, model_answer)
-    len_factor = min(1.0, len(words) / (70 if question["type"] == "Essay" else 25))
+    # Long-form written (Essay / Long Questions / heavy custom) vs short written.
+    long_form = float(question.get("marks") or 0) >= 8 or (
+        str(question.get("type") or "").lower() in {"essay", "long questions"}
+        or "long" in str(question.get("type") or "").lower()
+        or "essay" in str(question.get("type") or "").lower()
+    )
+    len_factor = min(1.0, len(words) / (70 if long_form else 25))
     rubric_pct = round(len_factor * 10) if coverage == 0 else min(
         100, round(coverage * 92 + len_factor * 10)
     )
@@ -252,7 +258,12 @@ async def grade_attempt_answers(exam: dict, answers: dict) -> dict:
     async def grade_one(question: dict) -> None:
         qid = question["qid"]
         answer = answers.get(qid)
-        if question["type"] == "MCQ":
+        fmt = question.get("format")
+        is_mcq_q = fmt == "mcq" or (
+            fmt not in ("mcq", "written")
+            and (question.get("type") == "MCQ" or bool(question.get("options")))
+        )
+        if is_mcq_q:
             results[qid] = _grade_mcq(question, answer)
             return
         text = (answer or "").strip()

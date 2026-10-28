@@ -213,8 +213,10 @@ export function regenerateExamQuestion(examId, qid) {
   return post(`/exams/${examId}/questions/${qid}/regenerate`)
 }
 
-export function addExamQuestion(examId, type) {
-  return post(`/exams/${examId}/questions`, { type })
+export function addExamQuestion(examId, type, format) {
+  const body = { type }
+  if (format) body.format = format
+  return post(`/exams/${examId}/questions`, body)
 }
 
 export function submitExamForApproval(examId) {

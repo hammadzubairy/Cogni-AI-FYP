@@ -1,3 +1,4 @@
+import { isMcqQuestion } from '../../utils/teacher'
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import * as api from '../../api'
@@ -59,7 +60,7 @@ export default function ExamDone() {
   }
 
   const questions = exam?.questions || []
-  const mcq = questions.filter((q) => q.type === 'MCQ')
+  const mcq = questions.filter((q) => isMcqQuestion(q))
   const hasWritten = questions.some((q) => q.type !== 'MCQ')
 
   const crumb = cls ? (

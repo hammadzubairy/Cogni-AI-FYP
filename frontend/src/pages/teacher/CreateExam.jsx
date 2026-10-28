@@ -11,10 +11,11 @@ import Panel from '../../components/Panel'
 import PipelineSteps from '../../components/PipelineSteps'
 import { useToast } from '../../components/Toast'
 import {
-  defaultCounts,
   defaultDuration,
   defaultExamTitle,
+  defaultQuestionTypes,
   GENERATE_PIPE_STEPS,
+  newWrittenQuestionType,
   QUESTION_CAP,
 } from '../../utils/teacher'
 
@@ -55,13 +56,8 @@ export default function CreateExam() {
   const [title, setTitle] = useState('')
   const [kind, setKind] = useState('Quiz')
   const [duration, setDuration] = useState(20)
-  const [mcq, setMcq] = useState(4)
-  const [short, setShort] = useState(2)
-  const [essay, setEssay] = useState(1)
+  const [qTypes, setQTypes] = useState(() => defaultQuestionTypes('Quiz'))
   const [marksMode, setMarksMode] = useState('suggested')
-  const [mMcq, setMMcq] = useState(2)
-  const [mShort, setMShort] = useState(5)
-  const [mEssay, setMEssay] = useState(10)
   const [totalMarks, setTotalMarks] = useState(50)
   const [linkedReq, setLinkedReq] = useState(reqId || '')
   const [fieldErrors, setFieldErrors] = useState({})
@@ -96,10 +92,7 @@ export default function CreateExam() {
       setClassId(initialClass || '')
       setKind(initialKind)
       setDuration(defaultDuration(initialKind))
-      const counts = defaultCounts(initialKind)
-      setMcq(counts.MCQ)
-      setShort(counts.Short)
-      setEssay(counts.Essay)
+      setQTypes(defaultQuestionTypes(initialKind))
       setLinkedReq(initialReq || '')
 
       if (initialClass) {
@@ -139,11 +132,23 @@ export default function CreateExam() {
     [requests, classId],
   )
 
-  const totalQ = (Number(mcq) || 0) + (Number(short) || 0) + (Number(essay) || 0)
-  const suggestedTotal =
-    (Number(mcq) || 0) * (Number(mMcq) || 0) +
-    (Number(short) || 0) * (Number(mShort) || 0) +
-    (Number(essay) || 0) * (Number(mEssay) || 0)
+  const totalQ = qTypes.reduce((s, t) => s + (Number(t.count) || 0), 0)
+  const suggestedTotal = qTypes.reduce(
+    (s, t) => s + (Number(t.count) || 0) * (Number(t.marks) || 0),
+    0,
+  )
+
+  function updateQType(id, patch) {
+    setQTypes((prev) => prev.map((t) => (t.id === id ? { ...t, ...patch } : t)))
+  }
+
+  function addQType() {
+    setQTypes((prev) => [...prev, newWrittenQuestionType(prev.length + 1)])
+  }
+
+  function removeQType(id) {
+    setQTypes((prev) => (prev.length <= 1 ? prev : prev.filter((t) => t.id !== id)))
+  }
 
   async function onClassChange(id) {
     setClassId(id)
@@ -166,10 +171,7 @@ export default function CreateExam() {
   function onKindChange(k) {
     setKind(k)
     setDuration(defaultDuration(k))
-    const counts = defaultCounts(k)
-    setMcq(counts.MCQ)
-    setShort(counts.Short)
-    setEssay(counts.Essay)
+    setQTypes(defaultQuestionTypes(k))
     if (!titleTouched && activeClass) {
       setTitle(defaultExamTitle(k, activeClass.name, 1))
     }
@@ -186,8 +188,11 @@ export default function CreateExam() {
     if (!classId) errs.class = 'Choose a class'
     if (!materialIds.length) errs.materials = 'Select at least one material'
     if (!(Number(duration) >= 5)) errs.duration = 'Set a time limit of at least 5 minutes'
-    if (totalQ < 1) errs.mcq = 'Choose at least one question of any type'
-    if (totalQ > QUESTION_CAP) errs.mcq = `Total questions cannot exceed ${QUESTION_CAP}`
+    if (totalQ < 1) errs.types = 'Choose at least one question of any type'
+    if (totalQ > QUESTION_CAP) errs.types = `Total questions cannot exceed ${QUESTION_CAP}`
+    const labels = qTypes.map((t) => String(t.label || '').trim().toLowerCase()).filter(Boolean)
+    if (labels.length !== qTypes.length) errs.types = 'Every question type needs a name'
+    if (new Set(labels).size !== labels.length) errs.types = 'Question type names must be unique'
     if (!title.trim()) errs.title = 'Enter a title'
     if (marksMode === 'total') {
       const t = Number(totalMarks)
@@ -195,8 +200,8 @@ export default function CreateExam() {
       else if (t > 1000) errs.marks = 'Total marks cannot exceed 1000'
       else if (t < totalQ * 0.5) errs.marks = `Total marks must be at least ${totalQ * 0.5} for ${totalQ} questions`
     } else {
-      for (const v of [mMcq, mShort, mEssay]) {
-        const n = Number(v)
+      for (const t of qTypes) {
+        const n = Number(t.marks)
         if (!(n >= 0.5 && n <= 100)) errs.marks = 'Marks per question must be between 0.5 and 100'
       }
     }
@@ -215,17 +220,16 @@ export default function CreateExam() {
       kind,
       duration_min: Number(duration),
       material_ids: materialIds,
-      counts: {
-        MCQ: Number(mcq) || 0,
-        Short: Number(short) || 0,
-        Essay: Number(essay) || 0,
-      },
+      types: qTypes.map((t) => ({
+        label: String(t.label || '').trim().slice(0, 40),
+        count: Number(t.count) || 0,
+        format: t.format === 'mcq' ? 'mcq' : 'written',
+        marks: Number(t.marks) || 5,
+      })),
       marks_mode: marksMode,
     }
     if (marksMode === 'total') {
       body.total_marks = Number(totalMarks)
-    } else {
-      body.marks_per_type = { MCQ: Number(mMcq), Short: Number(mShort), Essay: Number(mEssay) }
     }
     if (linkedReq) body.request_id = linkedReq
     setBusy(true)
@@ -455,51 +459,97 @@ export default function CreateExam() {
 
             <h3 style={{ fontSize: 15.5, margin: '4px 0' }}>Question mix</h3>
             <p className="small" style={{ margin: '0 0 10px' }}>
-              How many of each type to generate. Total cannot exceed {QUESTION_CAP}.
+              Rename any type, set how many to generate, and add more written kinds. Total cannot exceed{' '}
+              {QUESTION_CAP}.
             </p>
-            <div className="grid g3" style={{ alignItems: 'end' }}>
-              <Field id="cf-mcq" label="MCQ" error={fieldErrors.mcq}>
-                <input
-                  id="cf-mcq"
-                  type="number"
-                  min={0}
-                  max={QUESTION_CAP}
-                  value={mcq}
-                  disabled={busy}
-                  onChange={(e) => setMcq(e.target.value)}
-                />
-              </Field>
-              <Field id="cf-short" label="Short">
-                <input
-                  id="cf-short"
-                  type="number"
-                  min={0}
-                  max={QUESTION_CAP}
-                  value={short}
-                  disabled={busy}
-                  onChange={(e) => setShort(e.target.value)}
-                />
-              </Field>
-              <Field id="cf-essay" label="Essay">
-                <input
-                  id="cf-essay"
-                  type="number"
-                  min={0}
-                  max={QUESTION_CAP}
-                  value={essay}
-                  disabled={busy}
-                  onChange={(e) => setEssay(e.target.value)}
-                />
-              </Field>
+            <div className="qtype-list" role="group" aria-label="Question types">
+              {qTypes.map((t, idx) => (
+                <div key={t.id} className="qtype-row">
+                  <div className="qtype-label">
+                    <Field
+                      id={`cf-label-${idx}`}
+                      label="Type name"
+                      error={idx === 0 ? fieldErrors.types : undefined}
+                    >
+                      <input
+                        id={`cf-label-${idx}`}
+                        value={t.label}
+                        disabled={busy}
+                        maxLength={40}
+                        onChange={(e) => updateQType(t.id, { label: e.target.value })}
+                      />
+                    </Field>
+                  </div>
+                  <div className="qtype-count">
+                    <Field id={`cf-count-${idx}`} label="Count">
+                      <input
+                        id={idx === 0 ? 'cf-mcq' : idx === 1 ? 'cf-short' : idx === 2 ? 'cf-essay' : `cf-count-${idx}`}
+                        type="number"
+                        min={0}
+                        max={QUESTION_CAP}
+                        value={t.count}
+                        disabled={busy}
+                        onChange={(e) => updateQType(t.id, { count: e.target.value })}
+                      />
+                    </Field>
+                  </div>
+                  {marksMode === 'suggested' ? (
+                    <div className="qtype-marks">
+                      <Field
+                        id={`cf-marks-${idx}`}
+                        label="Marks each"
+                        error={idx === 0 ? fieldErrors.marks : undefined}
+                      >
+                        <input
+                          id={
+                            idx === 0
+                              ? 'cf-m-mcq'
+                              : idx === 1
+                                ? 'cf-m-short'
+                                : idx === 2
+                                  ? 'cf-m-essay'
+                                  : `cf-marks-${idx}`
+                          }
+                          type="number"
+                          min={0.5}
+                          max={100}
+                          step={0.5}
+                          value={t.marks}
+                          disabled={busy}
+                          onChange={(e) => updateQType(t.id, { marks: e.target.value })}
+                        />
+                      </Field>
+                    </div>
+                  ) : (
+                    <span className="qtype-marks" aria-hidden="true" />
+                  )}
+                  <button
+                    type="button"
+                    className="btn small ghost qtype-remove"
+                    aria-label={`Remove ${t.label || 'type'}`}
+                    disabled={busy || qTypes.length <= 1 || t.format === 'mcq'}
+                    title={t.format === 'mcq' ? 'Keep at least the MCQ type' : 'Remove type'}
+                    onClick={() => removeQType(t.id)}
+                  >
+                    <Icon name="x" className="sm" />
+                  </button>
+                </div>
+              ))}
             </div>
-            <p className="small" style={{ margin: '0 0 12px' }}>
-              Total: {totalQ} / {QUESTION_CAP}
-            </p>
+            <div className="row" style={{ marginBottom: 12, gap: 10, flexWrap: 'wrap' }}>
+              <button type="button" className="btn small" disabled={busy} onClick={addQType}>
+                <Icon name="plus" className="sm" /> Add type
+              </button>
+              <span className="small">Total: {totalQ} / {QUESTION_CAP}</span>
+              {marksMode === 'suggested' ? (
+                <span className="small">Paper total: {suggestedTotal} marks</span>
+              ) : null}
+            </div>
 
             <h3 style={{ fontSize: 15.5, margin: '4px 0' }}>Marks</h3>
             <p className="small" style={{ margin: '0 0 10px' }}>
-              Start from the suggested marks, or give the total for the paper and we will spread it across
-              the questions. You can still change marks on any question in the editor.
+              Start from the suggested marks per type above, or give the total for the paper and we will
+              spread it across the questions. You can still change marks on any question in the editor.
             </p>
             <div className="row" style={{ marginBottom: 10 }}>
               <label className="small" style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
@@ -523,22 +573,7 @@ export default function CreateExam() {
                 I set the total marks
               </label>
             </div>
-            {marksMode === 'suggested' ? (
-              <>
-                <div className="grid g3" style={{ alignItems: 'end' }}>
-                  <Field id="cf-m-mcq" label="Marks per MCQ" error={fieldErrors.marks}>
-                    <input id="cf-m-mcq" type="number" min={0.5} max={100} step={0.5} value={mMcq} disabled={busy} onChange={(e) => setMMcq(e.target.value)} />
-                  </Field>
-                  <Field id="cf-m-short" label="Marks per Short">
-                    <input id="cf-m-short" type="number" min={0.5} max={100} step={0.5} value={mShort} disabled={busy} onChange={(e) => setMShort(e.target.value)} />
-                  </Field>
-                  <Field id="cf-m-essay" label="Marks per Essay">
-                    <input id="cf-m-essay" type="number" min={0.5} max={100} step={0.5} value={mEssay} disabled={busy} onChange={(e) => setMEssay(e.target.value)} />
-                  </Field>
-                </div>
-                <p className="small" style={{ margin: '0 0 12px' }}>Paper total: {suggestedTotal} marks</p>
-              </>
-            ) : (
+            {marksMode === 'total' ? (
               <>
                 <Field id="cf-total-marks" label="Total marks for the paper" error={fieldErrors.marks}>
                   <input id="cf-total-marks" type="number" min={1} max={1000} step={0.5} value={totalMarks} disabled={busy} onChange={(e) => setTotalMarks(e.target.value)} />
@@ -547,7 +582,7 @@ export default function CreateExam() {
                   Longer question types get more of the {Number(totalMarks) || 0} marks. The paper adds up to exactly this total.
                 </p>
               </>
-            )}
+            ) : null}
 
             {openReqsForClass.length ? (
               <Field id="cf-req" label="Link to HOD request (optional)">

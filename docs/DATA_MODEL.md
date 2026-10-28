@@ -21,7 +21,7 @@ Email verification tokens: `email_verifications` — `token_hash` (unique), `use
 `id, title, class_id, teacher_id, kind (Quiz|Midterm|Final), duration_min, status (draft|pending|returned|approved|published|closed), questions[], ai_threshold, released, hod_comment, request_id|null, material_ids[], history[{at,by,text}], created_at`
 
 ### question (embedded in `exams.questions[]`)
-`qid (uuid), type (MCQ|Short|Essay), bloom (Remember|Understand|Apply|Analyze|Evaluate|Create), topic, clo, text, options[]|null, answer_index|null, model_answer, keywords[{label,variants[]}], marks, source_chunk_idx|null`
+`qid (uuid), type (string label, e.g. MCQ|Short Questions|Long Questions|custom), format (mcq|written; derived for legacy docs), bloom (Remember|Understand|Apply|Analyze|Evaluate|Create), topic, clo, text, options[]|null, answer_index|null, model_answer, keywords[{label,variants[]}], marks, source_chunk_idx|null`
 
 ## attempts
 `id, exam_id, student_id, status (in_progress|submitted), started_at, submitted_at|null, answers{qid: int|str}, results{qid:{score,max,similarity,key_points_hit[],key_points_missed[],reason,ai_probability}}, flags{qid: cleared|discuss}, overrides{qid:number}`

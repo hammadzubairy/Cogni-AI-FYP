@@ -31,7 +31,7 @@ export default function AuthShell({ title, subtitle, children, sideTitle, sideBo
               </Link>
             </span>
           </div>
-          <div>
+          <div className="auth-card">
             <h1>{title}</h1>
             {subtitle ? (
               <p className="small" style={{ margin: '0 0 22px' }}>

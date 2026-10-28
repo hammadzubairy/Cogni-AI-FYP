@@ -4,6 +4,7 @@ from app.core.db import get_db, oid
 from app.core.deps import CurrentUser
 from app.prompts.feedback import STUDY_TIPS_SYSTEM_PROMPT, build_study_tips_user_prompt
 from app.services.attempts import auto_close_if_expired
+from app.services.exam_generator import is_mcq
 from app.services.grading import effective_score, effective_total
 from app.services.llm import LLMError, call_json, get_llm_client
 
@@ -64,7 +65,7 @@ async def get_feedback(user: CurrentUser, attempt_id: str) -> dict:
 
     missed_by_topic: dict[str, list[str]] = {}
     for q in exam["questions"]:
-        if q["topic"] not in weakest or q["type"] == "MCQ":
+        if q["topic"] not in weakest or is_mcq(q):
             continue
         result = attempt.get("results", {}).get(q["qid"], {})
         missed_by_topic.setdefault(q["topic"], []).extend(result.get("key_points_missed", []))

@@ -1,3 +1,4 @@
+import { isMcqQuestion } from './teacher'
 /** Teacher results / attempt-review helpers. */
 
 import { pctColor } from './status'
@@ -24,7 +25,7 @@ export function countAtThreshold(details, threshold) {
   let n = 0
   ;(details || []).forEach((d) => {
     ;(d.questions || []).forEach((q) => {
-      if (q.type === 'MCQ') return
+      if (isMcqQuestion(q)) return
       const ai = q.result?.ai_probability
       if (ai != null && ai >= thr) n += 1
     })
@@ -37,7 +38,7 @@ export function flagsForAttempt(detail, threshold) {
   const thr = Number(threshold) || 0
   const out = []
   ;(detail?.questions || []).forEach((q, i) => {
-    if (q.type === 'MCQ') return
+    if (isMcqQuestion(q)) return
     const ai = q.result?.ai_probability
     if (ai == null || ai < thr) return
     const dec = q.flag_decision

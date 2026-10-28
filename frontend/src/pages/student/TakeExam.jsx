@@ -1,3 +1,4 @@
+import { isMcqQuestion } from '../../utils/teacher'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import * as api from '../../api'
@@ -416,16 +417,13 @@ export default function TakeExam() {
   }
 
   if (phase === 'before') {
-    const counts = { MCQ: 0, Short: 0, Essay: 0 }
+    const counts = {}
     questions.forEach((qq) => {
-      if (counts[qq.type] != null) counts[qq.type]++
+      const label = qq.type || (isMcqQuestion(qq) ? 'MCQ' : 'Written')
+      counts[label] = (counts[label] || 0) + 1
     })
-    const mix = [
-      counts.MCQ && `${counts.MCQ} multiple choice`,
-      counts.Short && `${counts.Short} short answer`,
-      counts.Essay && `${counts.Essay} essay`,
-    ]
-      .filter(Boolean)
+    const mix = Object.entries(counts)
+      .map(([label, n]) => `${n} ${label}`)
       .join(', ')
     const maxMarks = questions.reduce((s, qq) => s + (Number(qq.marks) || 0), 0)
 
@@ -573,7 +571,7 @@ export default function TakeExam() {
             </h2>
             <Pill
               label={`${
-                q.type === 'MCQ' ? 'Multiple choice' : q.type === 'Short' ? 'Short answer' : 'Essay'
+                isMcqQuestion(q) ? 'Multiple choice' : q.type || 'Written'
               } · ${q.marks} marks`}
               tone="p-grey"
             />
@@ -591,7 +589,7 @@ export default function TakeExam() {
               {q.text}
             </p>
 
-            {q.type === 'MCQ' ? (
+            {isMcqQuestion(q) ? (
               <>
                 <div role="radiogroup" aria-labelledby="q-text">
                   {(q.options || []).map((o, k) => {

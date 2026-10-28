@@ -14,7 +14,13 @@ from app.prompts.quality_filter import (
 )
 from app.services.llm import LLMClient, LLMError, call_json
 
-MARKS_BY_TYPE = {"MCQ": 2, "Short": 5, "Essay": 10}
+MARKS_BY_TYPE = {
+    "MCQ": 2,
+    "Short": 5,
+    "Short Questions": 5,
+    "Essay": 10,
+    "Long Questions": 10,
+}
 BLOOM_LEVELS = {"Remember", "Understand", "Apply", "Analyze", "Evaluate", "Create"}
 HIGHER_ORDER_BLOOMS = {"Analyze", "Evaluate", "Create"}
 MAX_TOTAL_QUESTIONS = 40
@@ -22,6 +28,34 @@ LONG_MATERIAL_WORDS = 3500
 MAX_SOURCE_CHUNKS = 10
 MAX_CHUNK_CHARS = 1200
 DUPLICATE_JACCARD_THRESHOLD = 0.8
+
+
+def resolve_format(q: dict, formats: dict[str, str] | None = None) -> str:
+    """Return 'mcq' or 'written' for a question dict (legacy-safe)."""
+    fmt = q.get("format")
+    if fmt in ("mcq", "written"):
+        return fmt
+    label = q.get("type") or ""
+    if formats and label in formats:
+        return formats[label]
+    if label == "MCQ" or (isinstance(q.get("options"), list) and q.get("options")):
+        return "mcq"
+    return "written"
+
+
+def is_mcq(q: dict, formats: dict[str, str] | None = None) -> bool:
+    return resolve_format(q, formats) == "mcq"
+
+
+def default_marks_for(label: str, format_: str | None = None) -> float:
+    if label in MARKS_BY_TYPE:
+        return float(MARKS_BY_TYPE[label])
+    if format_ == "mcq" or label == "MCQ":
+        return 2.0
+    low = (label or "").lower()
+    if "long" in low or "essay" in low:
+        return 10.0
+    return 5.0
 
 
 def select_source_chunks(chunks: list[dict]) -> list[dict]:
@@ -65,19 +99,20 @@ def _is_duplicate(question: dict, others: list[dict]) -> bool:
     )
 
 
-def validate_question(q: dict) -> str | None:
+def validate_question(q: dict, formats: dict[str, str] | None = None) -> str | None:
     """Return a human-readable error, or None if the question is valid."""
     if not isinstance(q, dict):
         return "question is not an object"
     if not {"type", "bloom", "topic", "clo", "text"}.issubset(q):
         return "missing required fields"
-    if q["type"] not in MARKS_BY_TYPE:
+    label = q.get("type")
+    if not isinstance(label, str) or not label.strip() or len(label.strip()) > 40:
         return "invalid type"
     if q["bloom"] not in BLOOM_LEVELS:
         return "invalid bloom level"
     if not q.get("text") or not q.get("topic") or not q.get("clo"):
         return "text/topic/clo must not be empty"
-    if q["type"] == "MCQ":
+    if is_mcq(q, formats):
         options = q.get("options")
         if not isinstance(options, list) or len(options) != 4:
             return "MCQ needs exactly 4 options"
@@ -113,18 +148,25 @@ def plan_marks(
     per-type marks, rounded to 0.5, summing to exactly `total`)."""
     if not questions:
         return
-    per_type = per_type or MARKS_BY_TYPE
+    per_type = per_type or {}
+
+    def _weight(q: dict) -> float:
+        label = q.get("type") or ""
+        if label in per_type:
+            return float(per_type[label])
+        return default_marks_for(label, resolve_format(q))
+
     if mode != "total" or not total:
         for q in questions:
-            q["marks"] = per_type.get(q["type"], MARKS_BY_TYPE[q["type"]])
+            q["marks"] = _weight(q)
         return
     step = 0.5
     units = round(total / step)
     n = len(questions)
     if units < n:
         raise ValueError("Total marks must allow at least 0.5 marks per question.")
-    weights = [MARKS_BY_TYPE[q["type"]] for q in questions]
-    wsum = sum(weights)
+    weights = [_weight(q) for q in questions]
+    wsum = sum(weights) or n
     # Every question gets one unit, the rest is shared by weight (largest remainder).
     spare = units - n
     raw = [spare * w / wsum for w in weights]
@@ -137,14 +179,17 @@ def plan_marks(
         q["marks"] = (1 + extra) * step
 
 
-def finalize_question(raw: dict) -> dict:
+def finalize_question(raw: dict, formats: dict[str, str] | None = None) -> dict:
     """Assign qid/marks and normalize optional fields on an already-valid
     question dict returned by the LLM."""
     q = dict(raw)
+    q["type"] = str(q["type"]).strip()[:40]
     q["qid"] = str(uuid.uuid4())
-    q["marks"] = MARKS_BY_TYPE[q["type"]]
+    fmt = resolve_format(q, formats)
+    q["format"] = fmt
+    q["marks"] = default_marks_for(q["type"], fmt)
     q.setdefault("source_chunk_idx", None)
-    if q["type"] == "MCQ":
+    if fmt == "mcq":
         q.setdefault("model_answer", "")
         q.setdefault("keywords", [])
     else:
@@ -172,6 +217,7 @@ async def _call_llm_for_questions(
     counts: dict[str, int],
     clos: list[str],
     *,
+    formats: dict[str, str] | None = None,
     avoid_texts: list[str] | None = None,
     preferred_topic: str | None = None,
     preferred_clo: str | None = None,
@@ -180,6 +226,7 @@ async def _call_llm_for_questions(
         chunks,
         counts,
         clos,
+        formats=formats,
         avoid_texts=avoid_texts,
         preferred_topic=preferred_topic,
         preferred_clo=preferred_clo,
@@ -189,11 +236,11 @@ async def _call_llm_for_questions(
 
     questions, warnings = [], []
     for raw in raw_questions:
-        error = validate_question(raw)
+        error = validate_question(raw, formats)
         if error:
             warnings.append(f"Dropped an invalid question: {error}.")
             continue
-        questions.append(finalize_question(raw))
+        questions.append(finalize_question(raw, formats))
     return questions, warnings
 
 
@@ -265,6 +312,7 @@ async def generate_questions(
     counts: dict[str, int],
     clos: list[str],
     *,
+    formats: dict[str, str] | None = None,
     existing_exam_questions: list[list[dict]] | None = None,
 ) -> tuple[list[dict], list[str]]:
     """Generate, validate, quality-filter, deduplicate and top up questions."""
@@ -273,7 +321,9 @@ async def generate_questions(
         raise ValueError(f"Cannot request more than {MAX_TOTAL_QUESTIONS} questions.")
 
     source_chunks = select_source_chunks(chunks)
-    questions, warnings = await _call_llm_for_questions(llm, source_chunks, counts, clos)
+    questions, warnings = await _call_llm_for_questions(
+        llm, source_chunks, counts, clos, formats=formats
+    )
 
     deduped: list[dict] = []
     for q in questions:
@@ -299,7 +349,12 @@ async def generate_questions(
     shortfall = {t: n for t, n in shortfall.items() if n > 0}
     if shortfall:
         retry_questions, retry_warnings = await _call_llm_for_questions(
-            llm, source_chunks, shortfall, clos, avoid_texts=[q["text"] for q in questions]
+            llm,
+            source_chunks,
+            shortfall,
+            clos,
+            formats=formats,
+            avoid_texts=[q["text"] for q in questions],
         )
         warnings.extend(retry_warnings)
         retry_questions, retry_qa = await filter_questions_quality(llm, retry_questions)
@@ -337,6 +392,7 @@ async def regenerate_one(
     qtype: str,
     clos: list[str],
     *,
+    format_: str | None = None,
     preferred_topic: str | None = None,
     preferred_clo: str | None = None,
 ) -> dict:
@@ -344,11 +400,13 @@ async def regenerate_one(
     same topic/clo preferred. Raises ValueError if none came back valid."""
     source_chunks = select_source_chunks(chunks)
     avoid_texts = [q["text"] for q in existing_questions]
+    formats = {qtype: format_ or ("mcq" if qtype == "MCQ" else "written")}
     questions, _warnings = await _call_llm_for_questions(
         llm,
         source_chunks,
         {qtype: 1},
         clos,
+        formats=formats,
         avoid_texts=avoid_texts,
         preferred_topic=preferred_topic,
         preferred_clo=preferred_clo,

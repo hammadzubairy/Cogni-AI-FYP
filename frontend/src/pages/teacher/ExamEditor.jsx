@@ -12,7 +12,13 @@ import Pill from '../../components/Pill'
 import QuestionCard from '../../components/QuestionCard'
 import { useToast } from '../../components/Toast'
 import { formatShortDate } from '../../utils/format'
-import { BLOOM_SPREAD, examMaxMarks, needsApproval } from '../../utils/teacher'
+import { BLOOM_SPREAD, examMaxMarks, isMcqQuestion, needsApproval } from '../../utils/teacher'
+
+const DEFAULT_ADD_TYPES = [
+  { type: 'MCQ', format: 'mcq' },
+  { type: 'Short Questions', format: 'written' },
+  { type: 'Long Questions', format: 'written' },
+]
 
 function Stepper({ step = 2 }) {
   return (
@@ -205,6 +211,20 @@ export default function ExamEditor() {
       .filter(([q]) => (!filterType || q.type === filterType) && (!filterBloom || q.bloom === filterBloom))
   }, [questions, filterType, filterBloom])
 
+  const typeOptions = useMemo(() => {
+    const map = new Map()
+    for (const d of DEFAULT_ADD_TYPES) {
+      map.set(d.type, d.format)
+    }
+    for (const q of questions) {
+      if (!q?.type) continue
+      if (!map.has(q.type)) {
+        map.set(q.type, isMcqQuestion(q) ? 'mcq' : 'written')
+      }
+    }
+    return [...map.entries()].map(([type, format]) => ({ type, format }))
+  }, [questions])
+
   function errMsg(err) {
     return err instanceof ApiError ? err.message : 'Something went wrong.'
   }
@@ -291,11 +311,12 @@ export default function ExamEditor() {
     }
   }
 
-  async function onAddQuestion(type) {
+  async function onAddQuestion(type, format) {
+    const fmt = format || (type === 'MCQ' ? 'mcq' : 'written')
     try {
       const res = await withExamUpdate(
         async () => {
-          const r = await api.addExamQuestion(id, type)
+          const r = await api.addExamQuestion(id, type, fmt)
           return r?.exam || r
         },
         { toastMsg: 'Question added at the end' },
@@ -595,9 +616,9 @@ export default function ExamEditor() {
               onChange={(e) => setFilterType(e.target.value)}
             >
               <option value="">All types</option>
-              {['MCQ', 'Short', 'Essay'].map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              {typeOptions.map((t) => (
+                <option key={t.type} value={t.type}>
+                  {t.type}
                 </option>
               ))}
             </select>
@@ -620,18 +641,31 @@ export default function ExamEditor() {
               <>
                 <span className="sp" />
                 <span className="small">Add:</span>
-                {['MCQ', 'Short', 'Essay'].map((t) => (
+                {typeOptions.map((t) => (
                   <button
-                    key={t}
+                    key={t.type}
                     type="button"
                     className="btn small"
-                    onClick={() => onAddQuestion(t)}
+                    onClick={() => onAddQuestion(t.type, t.format)}
                     disabled={!!busyAction || !!regenQid}
                   >
                     <Icon name="plus" className="sm" />
-                    {t}
+                    {t.type}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  className="btn small"
+                  disabled={!!busyAction || !!regenQid}
+                  onClick={() => {
+                    const label = window.prompt('Name for the new written question type', 'New type')
+                    if (!label || !label.trim()) return
+                    onAddQuestion(label.trim().slice(0, 40), 'written')
+                  }}
+                >
+                  <Icon name="plus" className="sm" />
+                  Custom…
+                </button>
               </>
             ) : null}
           </div>

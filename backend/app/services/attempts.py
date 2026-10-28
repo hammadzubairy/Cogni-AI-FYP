@@ -4,6 +4,7 @@ from fastapi import HTTPException
 
 from app.core.db import get_db, oid, to_out
 from app.core.deps import CurrentUser
+from app.services.exam_generator import is_mcq
 from app.services.grading import (
     effective_score,
     effective_total,
@@ -118,7 +119,7 @@ async def save_answer(student: CurrentUser, attempt_id: str, qid: str, value) ->
     question = next((q for q in exam["questions"] if q["qid"] == qid), None)
     if question is None:
         raise HTTPException(status_code=404, detail="Question not found.")
-    if question["type"] == "MCQ":
+    if is_mcq(question):
         if not isinstance(value, int) or isinstance(value, bool) or not (0 <= value < 4):
             raise HTTPException(status_code=400, detail="Invalid answer for a multiple-choice question.")
     elif not isinstance(value, str):
@@ -192,7 +193,7 @@ async def get_exam_results(teacher: CurrentUser, exam_id: str) -> dict:
         flagged = sum(
             1
             for q in exam["questions"]
-            if q["type"] != "MCQ"
+            if not is_mcq(q)
             and (result := attempt.get("results", {}).get(q["qid"])) is not None
             and result.get("ai_probability") is not None
             and result["ai_probability"] >= exam["ai_threshold"]
@@ -261,14 +262,14 @@ async def get_attempt_detail(teacher: CurrentUser, attempt_id: str) -> dict:
                 "marks": q["marks"],
                 "options": q.get("options"),
                 "answer_index": q.get("answer_index"),
-                "model_answer": q.get("model_answer") if q["type"] != "MCQ" else None,
+                "model_answer": q.get("model_answer") if not is_mcq(q) else None,
                 "student_answer": attempt.get("answers", {}).get(qid),
                 "result": result,
                 "override": attempt.get("overrides", {}).get(qid),
                 "effective_score": effective_score(attempt, q),
                 "flag_decision": attempt.get("flags", {}).get(qid),
                 "flagged": (
-                    q["type"] != "MCQ"
+                    not is_mcq(q)
                     and result.get("ai_probability") is not None
                     and result["ai_probability"] >= exam["ai_threshold"]
                 ),
@@ -404,7 +405,7 @@ async def list_flags(teacher: CurrentUser) -> list[dict]:
         submitted = [a async for a in db.attempts.find({"exam_id": exam_id, "status": "submitted"})]
         for attempt in submitted:
             for q in exam["questions"]:
-                if q["type"] == "MCQ":
+                if is_mcq(q):
                     continue
                 result = attempt.get("results", {}).get(q["qid"])
                 if not result or result.get("ai_probability") is None:

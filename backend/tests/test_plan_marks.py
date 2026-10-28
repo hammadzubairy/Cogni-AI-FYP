@@ -40,3 +40,13 @@ def test_total_mode_weights_follow_type():
 def test_total_too_small_raises():
     with pytest.raises(ValueError):
         plan_marks(_qs(4, 0, 0), mode="total", total=1)
+
+
+def test_suggested_long_questions_label():
+    qs = [
+        {"type": "MCQ", "format": "mcq"},
+        {"type": "Short Questions", "format": "written"},
+        {"type": "Long Questions", "format": "written"},
+    ]
+    plan_marks(qs)
+    assert [q["marks"] for q in qs] == [2, 5, 10]

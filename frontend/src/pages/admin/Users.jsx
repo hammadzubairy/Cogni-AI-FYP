@@ -299,7 +299,7 @@ export default function Users() {
                         />
                       </td>
                       <td>
-                        <div className="row" style={{ flexWrap: 'nowrap', gap: 6 }}>
+                        <div className="row" style={{ gap: 6 }}>
                           <button
                             type="button"
                             className="btn small ghost"

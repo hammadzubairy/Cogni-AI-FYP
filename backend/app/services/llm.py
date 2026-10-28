@@ -245,6 +245,7 @@ class MockLLM(LLMClient):
             {"idx": 0, "heading": "General", "text": "General course material."}
         ]
         counts = payload.get("counts") or {}
+        formats = payload.get("formats") or {}
         clos = payload.get("clos") or ["CLO-1"]
         avoid = set(payload.get("avoid_texts") or [])
         preferred_topic = payload.get("preferred_topic")
@@ -258,6 +259,7 @@ class MockLLM(LLMClient):
         # the same heading, which made +MCQ/+Short/+Essay fail on seeded exams).
         salt = len(avoid)
         for qtype, count in counts.items():
+            fmt = formats.get(qtype) or ("mcq" if qtype == "MCQ" else "written")
             produced = 0
             attempts = 0
             while produced < count and attempts < count + 32:
@@ -266,7 +268,7 @@ class MockLLM(LLMClient):
                 bloom = bloom_cycle[n % len(bloom_cycle)]
                 heading = preferred_topic or chunk.get("heading") or f"Topic {chunk['idx']}"
                 question = self._build_question(
-                    qtype, bloom, heading, clo, chunk, n + salt, chunks
+                    qtype, bloom, heading, clo, chunk, n + salt, chunks, format_=fmt
                 )
                 if question["text"] not in avoid:
                     questions.append(question)
@@ -277,10 +279,20 @@ class MockLLM(LLMClient):
         return {"questions": questions}
 
     def _build_question(
-        self, qtype: str, bloom: str, heading: str, clo: str, chunk: dict, n: int, chunks: list
+        self,
+        qtype: str,
+        bloom: str,
+        heading: str,
+        clo: str,
+        chunk: dict,
+        n: int,
+        chunks: list,
+        *,
+        format_: str = "written",
     ) -> dict:
         base = {
             "type": qtype,
+            "format": format_,
             "bloom": bloom,
             "topic": heading,
             "clo": clo,
@@ -289,7 +301,8 @@ class MockLLM(LLMClient):
         snippet = _first_sentence(chunk["text"])
         # Variant index keeps each stem unique for avoid/dedupe checks.
         variant = n + 1
-        if qtype == "MCQ":
+        if format_ == "mcq" or qtype == "MCQ":
+            base["format"] = "mcq"
             correct = snippet or f"A key idea from {heading}."
             other_chunks = [c for c in chunks if c["idx"] != chunk["idx"]] or chunks
             candidates = [
@@ -326,8 +339,11 @@ class MockLLM(LLMClient):
                 }
             )
         else:
+            base["format"] = "written"
             keywords = _keywords_from_text(chunk["text"])
-            if qtype == "Short":
+            low = (qtype or "").lower()
+            shortish = "short" in low or qtype in ("Short", "Short Questions")
+            if shortish:
                 prompt = (
                     f'Item {variant} on {heading}: the source begins "{snippet}". '
                     f"In your own words, explain the key idea."

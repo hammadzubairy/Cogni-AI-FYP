@@ -81,7 +81,9 @@ async def add_question(
     payload: QuestionCreateRequest,
     teacher: CurrentUser = Depends(require_role("teacher")),
 ):
-    exam, warnings = await exam_service.add_question(teacher, exam_id, payload.type)
+    exam, warnings = await exam_service.add_question(
+        teacher, exam_id, payload.type, format_=payload.format
+    )
     return {"exam": exam, "warnings": warnings}
 
 

@@ -8,8 +8,10 @@ from app.services import settings as settings_service
 from app.services.exam_generator import (
     MAX_TOTAL_QUESTIONS,
     generate_questions,
+    is_mcq,
     plan_marks,
     regenerate_one,
+    resolve_format,
 )
 from app.services.grading import finalize_attempt
 from app.services.llm import get_llm_client
@@ -190,7 +192,9 @@ async def get_exam(user: CurrentUser, exam_id: str) -> dict:
 
 
 async def generate_exam(actor: CurrentUser, payload) -> tuple[dict, list[str]]:
-    counts = payload.counts.model_dump()
+    counts = payload.counts_map()
+    formats = payload.format_map()
+    marks_map = payload.marks_map()
     total = sum(counts.values())
     if total <= 0:
         raise HTTPException(status_code=400, detail="Request at least one question.")
@@ -235,7 +239,12 @@ async def generate_exam(actor: CurrentUser, payload) -> tuple[dict, list[str]]:
 
     llm = get_llm_client()
     questions, warnings = await generate_questions(
-        llm, chunks, counts, cls.get("clos", []), existing_exam_questions=existing_exam_questions
+        llm,
+        chunks,
+        counts,
+        cls.get("clos", []),
+        formats=formats,
+        existing_exam_questions=existing_exam_questions,
     )
     if not questions:
         raise HTTPException(
@@ -246,7 +255,7 @@ async def generate_exam(actor: CurrentUser, payload) -> tuple[dict, list[str]]:
         plan_marks(
             questions,
             mode=payload.marks_mode,
-            per_type=payload.marks_per_type.model_dump(),
+            per_type=marks_map,
             total=payload.total_marks,
         )
     except ValueError as exc:
@@ -310,13 +319,16 @@ async def update_question(actor: CurrentUser, exam_id: str, qid: str, patch) -> 
 
     updates = patch.model_dump(exclude_unset=True)
     question = {**questions[idx], **updates}
-    if question["type"] == "MCQ":
+    if is_mcq(question):
+        question["format"] = "mcq"
         options = question.get("options")
         if not isinstance(options, list) or len(options) != 4:
             raise HTTPException(status_code=400, detail="MCQ needs exactly 4 options.")
         answer_index = question.get("answer_index")
         if not isinstance(answer_index, int) or not (0 <= answer_index < 4):
             raise HTTPException(status_code=400, detail="MCQ needs a valid answer_index.")
+    else:
+        question["format"] = resolve_format(question)
 
     questions[idx] = question
     db = get_db()
@@ -364,6 +376,7 @@ async def regenerate_question(actor: CurrentUser, exam_id: str, qid: str) -> dic
             questions,
             old["type"],
             cls.get("clos", []),
+            format_=resolve_format(old),
             preferred_topic=old.get("topic"),
             preferred_clo=old.get("clo"),
         )
@@ -378,7 +391,13 @@ async def regenerate_question(actor: CurrentUser, exam_id: str, qid: str) -> dic
     return to_out(exam)
 
 
-async def add_question(actor: CurrentUser, exam_id: str, qtype: str) -> tuple[dict, list[str]]:
+async def add_question(
+    actor: CurrentUser,
+    exam_id: str,
+    qtype: str,
+    *,
+    format_: str | None = None,
+) -> tuple[dict, list[str]]:
     exam = await _get_exam_or_404(exam_id)
     _assert_teacher_owns(actor, exam)
     _assert_editable(exam)
@@ -388,9 +407,17 @@ async def add_question(actor: CurrentUser, exam_id: str, qtype: str) -> tuple[di
 
     cls = await _get_class_or_404(exam["class_id"])
     chunks = await _materials_chunks(exam["material_ids"])
+    fmt = format_ or ("mcq" if qtype == "MCQ" else "written")
 
     try:
-        new_q = await regenerate_one(get_llm_client(), chunks, exam["questions"], qtype, cls.get("clos", []))
+        new_q = await regenerate_one(
+            get_llm_client(),
+            chunks,
+            exam["questions"],
+            qtype,
+            cls.get("clos", []),
+            format_=fmt,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -625,7 +652,9 @@ async def get_checks(actor: CurrentUser, exam_id: str) -> list[dict]:
         "detail": f"max {policy['max_repeats']}",
     })
 
-    missing_model = sum(1 for q in questions if q["type"] != "MCQ" and not q["model_answer"].strip())
+    missing_model = sum(
+        1 for q in questions if not is_mcq(q) and not (q.get("model_answer") or "").strip()
+    )
     out.append({
         "ok": missing_model == 0,
         "text": (

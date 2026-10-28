@@ -324,3 +324,52 @@ def test_patch_marks_validated_and_kept_on_regenerate(client):
     regen = client.post(f"{url}/regenerate", headers=headers)
     assert regen.status_code == 200
     assert regen.json()["questions"][0]["marks"] == 3.5
+
+
+def test_generate_dynamic_types_long_questions(client):
+    c1_id = _class_id(client, "CS-201-A", TEACHER_A)
+    material_id = _first_material_id(client, c1_id, TEACHER_A)
+    headers = _auth(client, TEACHER_A)
+    resp = client.post(
+        "/api/exams/generate",
+        headers=headers,
+        json={
+            "class_id": c1_id,
+            "title": "Dynamic types paper",
+            "kind": "Quiz",
+            "duration_min": 30,
+            "material_ids": [material_id],
+            "types": [
+                {"label": "MCQ", "count": 2, "format": "mcq", "marks": 2},
+                {"label": "Short Questions", "count": 1, "format": "written", "marks": 5},
+                {"label": "Long Questions", "count": 1, "format": "written", "marks": 10},
+                {"label": "Case Study", "count": 1, "format": "written", "marks": 8},
+            ],
+            "marks_mode": "suggested",
+        },
+    )
+    assert resp.status_code == 201, resp.text
+    questions = resp.json()["exam"]["questions"]
+    by_type = {}
+    for q in questions:
+        by_type.setdefault(q["type"], 0)
+        by_type[q["type"]] += 1
+        assert q.get("format") in ("mcq", "written")
+        if q["type"] == "MCQ":
+            assert q["format"] == "mcq"
+            assert q.get("options")
+        else:
+            assert q["format"] == "written"
+            assert q.get("model_answer")
+    assert by_type.get("MCQ") == 2
+    assert by_type.get("Short Questions") == 1
+    assert by_type.get("Long Questions") == 1
+    assert by_type.get("Case Study") == 1
+
+    add = client.post(
+        f"/api/exams/{resp.json()['exam']['id']}/questions",
+        headers=headers,
+        json={"type": "Case Study", "format": "written"},
+    )
+    assert add.status_code == 201, add.text
+    assert any(q["type"] == "Case Study" for q in add.json()["exam"]["questions"])

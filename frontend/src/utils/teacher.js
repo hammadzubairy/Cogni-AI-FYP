@@ -65,6 +65,46 @@ export function defaultCounts(kind) {
   return { MCQ: 6, Short: 2, Essay: 1 }
 }
 
+/** Default renameable question-type rows for Create Exam. */
+export function defaultQuestionTypes(kind) {
+  const counts = defaultCounts(kind)
+  return [
+    { id: 'mcq', label: 'MCQ', format: 'mcq', count: counts.MCQ, marks: 2 },
+    {
+      id: 'short',
+      label: 'Short Questions',
+      format: 'written',
+      count: counts.Short,
+      marks: 5,
+    },
+    {
+      id: 'long',
+      label: 'Long Questions',
+      format: 'written',
+      count: counts.Essay,
+      marks: 10,
+    },
+  ]
+}
+
+export function newWrittenQuestionType(index = 1) {
+  return {
+    id: `custom-${Date.now()}-${index}`,
+    label: 'New type',
+    format: 'written',
+    count: 0,
+    marks: 10,
+  }
+}
+
+/** True when a question should render/grade as multiple choice. */
+export function isMcqQuestion(q) {
+  if (!q) return false
+  if (q.format === 'mcq') return true
+  if (q.format === 'written') return false
+  return q.type === 'MCQ' || (Array.isArray(q.options) && q.options.length > 0)
+}
+
 export const QUESTION_CAP = 40
 
 export const MATERIAL_PIPE_STEPS = [

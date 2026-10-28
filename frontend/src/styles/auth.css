@@ -1,8 +1,8 @@
 /* Ported verbatim from reference/Cogni.ai-v7.html <style> — login / auth */
 /* ============ LOGIN ============ */
 .auth{min-height:100vh;display:grid;grid-template-columns:400px 1fr}
-@media(max-width:900px){.auth{grid-template-columns:1fr}.auth .side{display:none}}
-.auth .side{background:var(--color-primary);background-image:radial-gradient(120% 80% at 0% 100%,rgba(255,255,255,.10),transparent 60%);color:#fff;padding:40px;display:flex;flex-direction:column;justify-content:space-between;gap:30px;position:sticky;top:0;height:100vh}
+.auth .side{background:var(--color-primary);background-image:radial-gradient(120% 80% at 0% 100%,rgba(255,255,255,.10),transparent 60%);color:#fff;padding:40px;display:flex;flex-direction:column;justify-content:space-between;gap:30px;position:sticky;top:0;height:100vh;min-width:0}
+@media(max-width:900px){.auth{grid-template-columns:1fr}.auth .side{display:none!important}}
 .auth .side h2{font-size:31px;line-height:1.12}
 .auth .side p{color:var(--color-foreground)}
 .auth .side .btn{background:transparent;color:#fff;border-color:rgba(255,255,255,.5);box-shadow:none}

@@ -1,3 +1,4 @@
+import { isMcqQuestion } from '../../utils/teacher'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import * as api from '../../api'
@@ -69,7 +70,7 @@ function ScoreRing({ percent, total, max }) {
 
 function answerDisplay(q, value) {
   if (value == null || value === '') return <i>Not answered</i>
-  if (q.type === 'MCQ') {
+  if (isMcqQuestion(q)) {
     const opts = q.options || []
     const idx = Number(value)
     if (Number.isInteger(idx) && opts[idx] != null) {

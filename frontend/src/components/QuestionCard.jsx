@@ -4,6 +4,7 @@ import Field from './Field'
 import Pill from './Pill'
 import Spinner from './Spinner'
 import { Icon } from './IconSprite'
+import { isMcqQuestion } from '../utils/teacher'
 
 const BLOOM_LEVELS = ['Remember', 'Understand', 'Apply', 'Analyze', 'Evaluate', 'Create']
 
@@ -75,7 +76,7 @@ export default function QuestionCard({
 
   const [draftText, setDraftText] = useState(text)
   const [draftOpts, setDraftOpts] = useState(() =>
-    type === 'MCQ' ? [...(opts.length === 4 ? opts : ['', '', '', ''])] : [],
+    isMcqQuestion(q) ? [...(opts.length === 4 ? opts : ['', '', '', ''])] : [],
   )
   const [draftAns, setDraftAns] = useState(typeof ans === 'number' ? ans : 0)
   const [draftModel, setDraftModel] = useState(model)
@@ -88,7 +89,7 @@ export default function QuestionCard({
   useEffect(() => {
     if (!editing) return
     setDraftText(text)
-    setDraftOpts(type === 'MCQ' ? [...(opts.length === 4 ? opts : ['', '', '', ''])] : [])
+    setDraftOpts(isMcqQuestion(q) ? [...(opts.length === 4 ? opts : ['', '', '', ''])] : [])
     setDraftAns(typeof ans === 'number' ? ans : 0)
     setDraftModel(model)
     setDraftBloom(bloom || 'Remember')
@@ -129,7 +130,7 @@ export default function QuestionCard({
     next.text = t
     next.bloom = draftBloom
     next.marks = m
-    if (type === 'MCQ') {
+    if (isMcqQuestion(q)) {
       next.options = draftOpts.map((o, i) => String(o || '').trim() || opts[i] || `Option ${'ABCD'[i]}`)
       next.answer_index = Number(draftAns)
     } else {
@@ -168,7 +169,7 @@ export default function QuestionCard({
             disabled={saving}
           />
         </Field>
-        {type === 'MCQ' ? (
+        {isMcqQuestion(q) ? (
           <>
             <div className="grid g2e">
               {draftOpts.map((o, k) => (
@@ -308,7 +309,7 @@ export default function QuestionCard({
         {regenerating ? <Spinner inline label="Regenerating…" /> : null}
       </div>
       <div className="qtext">{text}</div>
-      {type === 'MCQ' ? (
+      {isMcqQuestion(q) ? (
         <ul className="opts">
           {opts.map((o, k) => (
             <li key={k} className={k === ans ? 'ans' : ''}>
@@ -345,7 +346,7 @@ export default function QuestionCard({
       ) : null}
       <div className="checks" aria-label="Automatic checks">
         <span className="ck">Answerable from source</span>
-        {type === 'MCQ' ? (
+        {isMcqQuestion(q) ? (
           <span className="ck">Distractors verified wrong</span>
         ) : (
           <span className="ck">Model answer set</span>
