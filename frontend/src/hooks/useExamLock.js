@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
-export const MAX_EXAM_VIOLATIONS = 3
 const BLUR_DEBOUNCE_MS = 500
-const VIOLATION_COOLDOWN_MS = 1200
+const LEAVE_COOLDOWN_MS = 800
 
 function isFullscreen() {
   return Boolean(
@@ -42,78 +41,48 @@ export async function exitExamFullscreen() {
 }
 
 /**
- * Browser exam lockdown: fullscreen + tab/window leave detection.
- * Counts violations; at MAX_EXAM_VIOLATIONS calls onMaxViolations once.
+ * Hard fullscreen exam lock: no strike/violation UI.
+ * Leaving fullscreen, the tab, or the window calls onLeave once (exit confirm).
  */
-export default function useExamLock({
-  active,
-  onMaxViolations,
-  maxViolations = MAX_EXAM_VIOLATIONS,
-}) {
-  const [violationCount, setViolationCount] = useState(0)
-  const [blocked, setBlocked] = useState(false)
-  const [lastViolationType, setLastViolationType] = useState(null)
-  const [events, setEvents] = useState([])
+export default function useExamLock({ active, onLeave }) {
+  const [outOfLock, setOutOfLock] = useState(false)
 
   const activeRef = useRef(active)
-  const countRef = useRef(0)
-  const eventsRef = useRef([])
-  const blockedRef = useRef(false)
   const armedRef = useRef(false)
   const blurTimerRef = useRef(null)
-  const maxFiredRef = useRef(false)
-  const onMaxRef = useRef(onMaxViolations)
+  const onLeaveRef = useRef(onLeave)
   const ignoringFsExitRef = useRef(false)
-  const lastViolationAtRef = useRef(0)
+  const leaveFiredRef = useRef(false)
+  const lastLeaveAtRef = useRef(0)
+  const eventsRef = useRef([])
 
   useEffect(() => {
     activeRef.current = active
   }, [active])
   useEffect(() => {
-    onMaxRef.current = onMaxViolations
-  }, [onMaxViolations])
+    onLeaveRef.current = onLeave
+  }, [onLeave])
 
-  const recordViolation = useCallback(
-    (type) => {
-      if (!activeRef.current || maxFiredRef.current) return
-      const nowMs = Date.now()
-      if (nowMs - lastViolationAtRef.current < VIOLATION_COOLDOWN_MS) {
-        setBlocked(true)
-        blockedRef.current = true
-        return
-      }
-      lastViolationAtRef.current = nowMs
-      const at = new Date().toISOString()
-      const nextCount = countRef.current + 1
-      countRef.current = nextCount
-      const nextEvents = [...eventsRef.current, { type, at }]
-      eventsRef.current = nextEvents
-      setViolationCount(nextCount)
-      setLastViolationType(type)
-      setEvents(nextEvents)
-      setBlocked(true)
-      blockedRef.current = true
-
-      if (nextCount >= maxViolations) {
-        maxFiredRef.current = true
-        onMaxRef.current?.({
-          violationCount: nextCount,
-          events: nextEvents,
-          type,
-        })
-      }
-    },
-    [maxViolations],
-  )
+  const signalLeave = useCallback((type) => {
+    if (!activeRef.current || !armedRef.current) return
+    if (leaveFiredRef.current) return
+    const nowMs = Date.now()
+    if (nowMs - lastLeaveAtRef.current < LEAVE_COOLDOWN_MS) return
+    lastLeaveAtRef.current = nowMs
+    leaveFiredRef.current = true
+    const at = new Date().toISOString()
+    eventsRef.current = [...eventsRef.current, { type, at }]
+    setOutOfLock(true)
+    onLeaveRef.current?.({ type, at })
+  }, [])
 
   const reenterFullscreen = useCallback(async () => {
     if (!activeRef.current) return false
     try {
       ignoringFsExitRef.current = true
       await requestExamFullscreen()
-      setBlocked(false)
-      blockedRef.current = false
-      // Brief grace so the fullscreenchange from entering does not count.
+      leaveFiredRef.current = false
+      setOutOfLock(false)
       window.setTimeout(() => {
         ignoringFsExitRef.current = false
       }, 400)
@@ -127,8 +96,8 @@ export default function useExamLock({
   const disarm = useCallback(() => {
     activeRef.current = false
     armedRef.current = false
-    setBlocked(false)
-    blockedRef.current = false
+    leaveFiredRef.current = false
+    setOutOfLock(false)
     if (blurTimerRef.current) {
       clearTimeout(blurTimerRef.current)
       blurTimerRef.current = null
@@ -137,13 +106,12 @@ export default function useExamLock({
 
   const getIntegrityPayload = useCallback(
     () => ({
-      violation_count: countRef.current,
+      violation_count: 0,
       integrity_events: eventsRef.current,
     }),
     [],
   )
 
-  /* Arm after fullscreen is entered; listen while active */
   useEffect(() => {
     if (!active) {
       disarm()
@@ -151,20 +119,18 @@ export default function useExamLock({
     }
 
     armedRef.current = false
-    maxFiredRef.current = false
-    // Allow a moment for initial fullscreen before counting exits.
+    leaveFiredRef.current = false
     const armTimer = window.setTimeout(() => {
       armedRef.current = true
       if (!isFullscreen()) {
-        setBlocked(true)
-        blockedRef.current = true
+        signalLeave('fullscreen_exit')
       }
     }, 600)
 
     const onVisibility = () => {
       if (!armedRef.current || !activeRef.current) return
       if (document.visibilityState === 'hidden') {
-        recordViolation('tab_hide')
+        signalLeave('tab_hide')
       }
     }
 
@@ -174,9 +140,9 @@ export default function useExamLock({
       blurTimerRef.current = window.setTimeout(() => {
         blurTimerRef.current = null
         if (!activeRef.current || !armedRef.current) return
-        if (document.visibilityState === 'hidden') return // already counted as tab_hide
+        if (document.visibilityState === 'hidden') return
         if (!document.hasFocus()) {
-          recordViolation('window_blur')
+          signalLeave('window_blur')
         }
       }, BLUR_DEBOUNCE_MS)
     }
@@ -192,7 +158,7 @@ export default function useExamLock({
       if (!armedRef.current || !activeRef.current) return
       if (ignoringFsExitRef.current) return
       if (!isFullscreen()) {
-        recordViolation('fullscreen_exit')
+        signalLeave('fullscreen_exit')
       }
     }
 
@@ -235,14 +201,10 @@ export default function useExamLock({
       document.removeEventListener('contextmenu', onContextMenu)
       document.removeEventListener('keydown', onKeyDown, true)
     }
-  }, [active, disarm, recordViolation])
+  }, [active, disarm, signalLeave])
 
   return {
-    violationCount,
-    blocked,
-    lastViolationType,
-    events,
-    maxViolations,
+    outOfLock,
     reenterFullscreen,
     disarm,
     getIntegrityPayload,

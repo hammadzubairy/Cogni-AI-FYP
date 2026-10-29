@@ -1,5 +1,5 @@
 /**
- * Prove exam tab-lock + exit forfeit with screenshots → e2e/screenshots/exam-lock/
+ * Prove hard fullscreen lock (no violation UI) → e2e/screenshots/exam-lock/
  */
 import { expect, test } from '@playwright/test'
 import fs from 'node:fs'
@@ -13,7 +13,6 @@ const API = 'http://127.0.0.1:8000/api'
 const INDEX = []
 
 const TEACHER = 'ayesha.khan@umt.edu.pk'
-/** Fresh student — avoid colliding with seeded submitted attempts */
 const STUDENT = 'sana.iqbal@umt.edu.pk'
 
 async function snap(page, id, title) {
@@ -45,7 +44,6 @@ async function publishQuiz(request, title) {
   ).json()
   expect(materials?.[0]?.id).toBeTruthy()
 
-  // Prefer mock LLM (Playwright webServer). Retry once; fall back to any open published exam.
   let exam = null
   for (let i = 0; i < 2; i++) {
     const gen = await request.post(`${API}/exams/generate`, {
@@ -66,9 +64,6 @@ async function publishQuiz(request, title) {
   }
   if (!exam) {
     const exams = await (await request.get(`${API}/exams?class_id=${cls.id}`, { headers })).json()
-    const published = (exams || []).find((e) => e.status === 'published' && e.title)
-    expect(published?.id, 'Need a published exam when generate fails').toBeTruthy()
-    // Ensure this student has no attempt yet — pick published with no sana attempt
     const stToken = await apiLogin(request, STUDENT, 'student')
     const mine = await (
       await request.get(`${API}/attempts/mine`, {
@@ -85,7 +80,6 @@ async function publishQuiz(request, title) {
   return exam.id
 }
 
-/** Headless Chromium often rejects real fullscreen — stub so lock UI can run. */
 async function stubFullscreen(page) {
   await page.addInitScript(() => {
     let fsEl = null
@@ -116,16 +110,21 @@ async function studentUiLogin(page) {
 
 test.describe.configure({ mode: 'serial' })
 
-test.describe('Exam lock proof', () => {
+test.describe('Exam lock proof — hard fullscreen, no violations', () => {
   test.setTimeout(180_000)
 
   test.beforeAll(() => {
     fs.mkdirSync(OUT, { recursive: true })
+    for (const name of fs.readdirSync(OUT)) {
+      if (name.endsWith('.png') || name === 'INDEX.md') {
+        fs.unlinkSync(path.join(OUT, name))
+      }
+    }
   })
 
   test.afterAll(() => {
     const lines = [
-      '# Exam lock proof screenshots',
+      '# Exam lock proof screenshots (hard fullscreen, no violations)',
       '',
       '| ID | Title | File |',
       '|----|-------|------|',
@@ -135,8 +134,8 @@ test.describe('Exam lock proof', () => {
     fs.writeFileSync(path.join(OUT, 'INDEX.md'), lines.join('\n'))
   })
 
-  test('LOCK01 gate shows lockdown rules', async ({ page, request }) => {
-    const title = `Lock proof gate ${Date.now().toString(36)}`
+  test('LOCK01 gate shows hard lock + teacher time (no violations)', async ({ page, request }) => {
+    const title = `Hard lock gate ${Date.now().toString(36)}`
     const examId = await publishQuiz(request, title)
     await stubFullscreen(page)
     await studentUiLogin(page)
@@ -144,48 +143,61 @@ test.describe('Exam lock proof', () => {
     await expect(page.getByRole('heading', { name: /Before you start/i })).toBeVisible({
       timeout: 20_000,
     })
-    await expect(page.getByText(/fullscreen lock/i)).toBeVisible()
-    await expect(page.getByText(/3 violations/i)).toBeVisible()
-    await snap(page, 'LOCK01-gate-rules', 'Before-you-start gate lists fullscreen lock rules')
+    await expect(page.getByText(/hard fullscreen lock/i)).toBeVisible()
+    await expect(page.getByText(/Time limit is set by your teacher/i)).toBeVisible()
+    await expect(page.getByText(/violation/i)).toHaveCount(0)
+    await snap(page, 'LOCK01-gate-hard-lock', 'Gate: hard fullscreen lock, teacher time, no violations')
   })
 
-  test('LOCK02 taking UI + violation overlay', async ({ page, request }) => {
-    const title = `Lock proof take ${Date.now().toString(36)}`
+  test('LOCK02 taking UI shows fullscreen lock (no strike counter)', async ({ page, request }) => {
+    const title = `Hard lock take ${Date.now().toString(36)}`
     const examId = await publishQuiz(request, title)
     await stubFullscreen(page)
     await studentUiLogin(page)
     await page.goto(`/app/student/exams/${examId}/take`)
-    await expect(page.getByRole('button', { name: /^Start exam$/i })).toBeVisible({
-      timeout: 20_000,
-    })
     await page.getByRole('button', { name: /^Start exam$/i }).click()
     await expect(page.getByRole('region', { name: /Exam status/i })).toBeVisible({
       timeout: 20_000,
     })
+    await expect(page.getByText(/fullscreen lock/i)).toBeVisible()
+    await expect(page.getByText(/lock \d+\/\d+/i)).toHaveCount(0)
     await expect(page.getByRole('button', { name: /Exit exam/i })).toBeVisible()
-    await snap(page, 'LOCK02-taking-locked', 'Exam taking bar with Exit + lock counter')
+    await snap(page, 'LOCK02-taking-hard-lock', 'Taking: timer + fullscreen lock, no strike counter')
+  })
 
-    // Wait for lock arm (~600ms), then leave stubbed fullscreen (counts as a violation)
+  test('LOCK03 leave fullscreen opens exit confirm (not violation overlay)', async ({
+    page,
+    request,
+  }) => {
+    const title = `Hard lock leave ${Date.now().toString(36)}`
+    const examId = await publishQuiz(request, title)
+    await stubFullscreen(page)
+    await studentUiLogin(page)
+    await page.goto(`/app/student/exams/${examId}/take`)
+    await page.getByRole('button', { name: /^Start exam$/i }).click()
+    await expect(page.getByRole('button', { name: /Exit exam/i })).toBeVisible({
+      timeout: 20_000,
+    })
     await page.waitForTimeout(800)
     await page.evaluate(async () => {
       await document.exitFullscreen()
     })
-
-    const overlay = page.locator('.exam-lock-overlay')
-    await expect(overlay.getByRole('heading', { name: /Return to the exam/i })).toBeVisible({
+    await expect(page.getByRole('heading', { name: /Exit exam\?/i })).toBeVisible({
       timeout: 10_000,
     })
-    await expect(overlay.locator('b')).toHaveText(/1\s*\/\s*3/)
-    await snap(page, 'LOCK03-violation-overlay', 'Lock overlay after fullscreen-exit violation')
+    await expect(page.getByText(/only attempt/i)).toBeVisible()
+    await expect(page.locator('.exam-lock-overlay')).toHaveCount(0)
+    await expect(page.getByText(/Violations:/i)).toHaveCount(0)
+    await snap(page, 'LOCK03-leave-fs-exit-confirm', 'Leaving fullscreen → exit confirm, no violation UI')
 
-    await page.getByRole('button', { name: /Return to fullscreen/i }).click()
-    await expect(page.getByRole('heading', { name: /Return to the exam/i })).toHaveCount(0, {
+    await page.getByRole('button', { name: /Keep working/i }).click()
+    await expect(page.getByRole('heading', { name: /Exit exam\?/i })).toHaveCount(0, {
       timeout: 10_000,
     })
   })
 
   test('LOCK04 exit forfeits only attempt', async ({ page, request }) => {
-    const title = `Lock proof exit ${Date.now().toString(36)}`
+    const title = `Hard lock exit ${Date.now().toString(36)}`
     const examId = await publishQuiz(request, title)
     await stubFullscreen(page)
     await studentUiLogin(page)
@@ -196,15 +208,14 @@ test.describe('Exam lock proof', () => {
     })
     await page.getByRole('button', { name: /Exit exam/i }).click()
     await expect(page.getByRole('heading', { name: /Exit exam\?/i })).toBeVisible()
-    await snap(page, 'LOCK04-exit-confirm', 'Exit confirm warns that only attempt is forfeited')
+    await snap(page, 'LOCK04-exit-confirm', 'Exit confirm — forfeit only attempt')
 
     await page.getByRole('button', { name: /Exit and forfeit attempt/i }).click()
     await expect(page).toHaveURL(/\/app\/student\/attempts\/.+\/done/, { timeout: 30_000 })
-    await snap(page, 'LOCK05-forfeit-done', 'After exit forfeit — attempt done page')
+    await snap(page, 'LOCK05-forfeit-done', 'After exit forfeit — attempt done')
 
-    // Cannot start again
     await page.goto(`/app/student/exams/${examId}/take`)
     await expect(page.getByText(/already submitted/i)).toBeVisible({ timeout: 20_000 })
-    await snap(page, 'LOCK06-no-retake', 'Take URL after forfeit — already submitted, no retake')
+    await snap(page, 'LOCK06-no-retake', 'No retake after forfeit')
   })
 })

@@ -11,7 +11,6 @@ import Pill from '../../components/Pill'
 import { useToast } from '../../components/Toast'
 import useExamLock, {
   exitExamFullscreen,
-  MAX_EXAM_VIOLATIONS,
   requestExamFullscreen,
 } from '../../hooks/useExamLock'
 import {
@@ -52,13 +51,6 @@ function SaveStatus({ status }) {
   return null
 }
 
-function violationLabel(type) {
-  if (type === 'tab_hide') return 'tab switch or minimize'
-  if (type === 'window_blur') return 'switched to another window'
-  if (type === 'fullscreen_exit') return 'left fullscreen'
-  return 'left the exam'
-}
-
 export default function TakeExam() {
   const { id: examId } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -92,6 +84,10 @@ export default function TakeExam() {
   const titleRef = useRef(null)
   const lockPayloadRef = useRef(() => ({ violation_count: 0, integrity_events: [] }))
   const disarmRef = useRef(() => {})
+  const reenterFsRef = useRef(async () => false)
+  const exitModalOpenRef = useRef(false)
+  const skipReenterOnCloseRef = useRef(false)
+  const askExitRef = useRef(() => {})
 
   useEffect(() => {
     answersRef.current = answers
@@ -138,7 +134,7 @@ export default function TakeExam() {
         const integrity = lockPayloadRef.current()
         if (forfeit) {
           await api.forfeitAttempt(at.id, {
-            reason: endReason === 'violations' ? 'violations' : 'exit',
+            reason: 'exit',
             ...integrity,
           })
         } else {
@@ -176,25 +172,85 @@ export default function TakeExam() {
     [endExam],
   )
 
-  const onMaxViolations = useCallback(
-    () =>
-      endExam({
-        endReason: 'violations',
-        toastMsg: 'Too many lock violations. Your exam has been submitted and cannot be retaken.',
-        forfeit: true,
-      }),
-    [endExam],
-  )
+  const askExit = useCallback(() => {
+    if (!exam || !attemptRef.current || submittingRef.current) return
+    if (exitModalOpenRef.current) return
+    exitModalOpenRef.current = true
+    openModal(
+      <>
+        <h3>Exit exam?</h3>
+        <p className="small">
+          To leave the locked exam you must exit fullscreen. Leaving now will{' '}
+          <b>submit your answers and use up your only attempt</b>. You will not be able to retake
+          this exam.
+        </p>
+        <div className="acts">
+          <button
+            type="button"
+            className="btn"
+            onClick={async () => {
+              skipReenterOnCloseRef.current = true
+              closeModal()
+              exitModalOpenRef.current = false
+              const ok = await reenterFsRef.current()
+              if (!ok) {
+                toast('Could not return to fullscreen. Allow it and try again.', { type: 'error' })
+                askExitRef.current()
+              }
+            }}
+          >
+            Keep working
+          </button>
+          <button
+            type="button"
+            className="btn danger"
+            disabled={submitting}
+            onClick={() => {
+              skipReenterOnCloseRef.current = true
+              closeModal()
+              exitModalOpenRef.current = false
+              endExam({
+                endReason: 'exit',
+                toastMsg: 'You exited the exam. Your attempt has been submitted.',
+                forfeit: true,
+              })
+            }}
+          >
+            Exit and forfeit attempt
+          </button>
+        </div>
+      </>,
+      {
+        onClose: () => {
+          exitModalOpenRef.current = false
+          if (skipReenterOnCloseRef.current) {
+            skipReenterOnCloseRef.current = false
+            return
+          }
+          void reenterFsRef.current()
+        },
+      },
+    )
+  }, [exam, openModal, closeModal, endExam, submitting, toast])
+
+  useEffect(() => {
+    askExitRef.current = askExit
+  }, [askExit])
+
+  const onLeaveLock = useCallback(() => {
+    askExitRef.current()
+  }, [])
 
   const lock = useExamLock({
     active: phase === 'taking' && !submitting,
-    onMaxViolations,
+    onLeave: onLeaveLock,
   })
 
   useEffect(() => {
     lockPayloadRef.current = lock.getIntegrityPayload
     disarmRef.current = lock.disarm
-  }, [lock.getIntegrityPayload, lock.disarm])
+    reenterFsRef.current = lock.reenterFullscreen
+  }, [lock.getIntegrityPayload, lock.disarm, lock.reenterFullscreen])
 
   const load = useCallback(async () => {
     setPhase('loading')
@@ -411,39 +467,6 @@ export default function TakeExam() {
     }
   }
 
-  function askExit() {
-    if (!exam || !attempt || submittingRef.current) return
-    openModal(
-      <>
-        <h3>Exit exam?</h3>
-        <p className="small">
-          Leaving now will <b>submit your answers and use up your only attempt</b>. You will not be
-          able to retake this exam.
-        </p>
-        <div className="acts">
-          <button type="button" className="btn" onClick={closeModal}>
-            Keep working
-          </button>
-          <button
-            type="button"
-            className="btn danger"
-            disabled={submitting}
-            onClick={() => {
-              closeModal()
-              endExam({
-                endReason: 'exit',
-                toastMsg: 'You exited the exam. Your attempt has been submitted.',
-                forfeit: true,
-              })
-            }}
-          >
-            Exit and forfeit attempt
-          </button>
-        </div>
-      </>,
-    )
-  }
-
   function askSubmit() {
     if (!exam || !attempt || submittingRef.current) return
     const un = unansweredIndexes(questions, answersRef.current)
@@ -582,15 +605,15 @@ export default function TakeExam() {
             >
               <li>{mix}.</li>
               <li>
-                The exam runs in <b>fullscreen lock</b>. Leaving the tab, another window, or
-                fullscreen counts as a violation.
+                Time limit is set by your teacher: <b>{exam.duration_min} minutes</b>.
               </li>
               <li>
-                After <b>{MAX_EXAM_VIOLATIONS} violations</b>, your answers are submitted
-                automatically and you cannot retake.
+                The exam runs in a <b>hard fullscreen lock</b>. You cannot switch tabs or windows
+                while locked.
               </li>
               <li>
-                <b>Exit exam</b> also uses up your only attempt. You get one sitting.
+                To leave, exit fullscreen (or use <b>Exit exam</b>). That uses up your only attempt —
+                you cannot retake.
               </li>
               <li>Answers save automatically. The exam submits itself when time runs out.</li>
               <li>
@@ -635,7 +658,6 @@ export default function TakeExam() {
   const wc = wordCount(a)
   const low = left != null && left < 300
   const timerText = left == null ? '--:--' : formatMmSs(left)
-  const strikesLeft = Math.max(0, lock.maxViolations - lock.violationCount)
 
   return (
     <>
@@ -674,10 +696,7 @@ export default function TakeExam() {
               {answered} of {questions.length}
             </b>{' '}
             answered
-            <span className="hide-sm">
-              {' '}
-              · lock {lock.violationCount}/{lock.maxViolations}
-            </span>
+            <span className="hide-sm"> · fullscreen lock</span>
           </div>
           <div className="bar" aria-hidden="true">
             <i
@@ -876,44 +895,6 @@ export default function TakeExam() {
           </div>
         </aside>
       </div>
-
-      {lock.blocked ? (
-        <div className="exam-lock-overlay" role="alertdialog" aria-modal="true" aria-labelledby="exam-lock-title">
-          <div className="exam-lock-card">
-            <h2 id="exam-lock-title">Return to the exam</h2>
-            <p>
-              Detected: {violationLabel(lock.lastViolationType)}. Violations:{' '}
-              <b>
-                {lock.violationCount} / {lock.maxViolations}
-              </b>
-              .
-            </p>
-            {strikesLeft <= 1 && lock.violationCount < lock.maxViolations ? (
-              <p className="exam-lock-warn">
-                Last chance — one more violation will submit your exam permanently.
-              </p>
-            ) : null}
-            {lock.violationCount >= lock.maxViolations ? (
-              <p className="exam-lock-warn">Submitting your exam…</p>
-            ) : (
-              <button
-                type="button"
-                className="btn primary"
-                onClick={async () => {
-                  const ok = await lock.reenterFullscreen()
-                  if (!ok) {
-                    toast('Could not enter fullscreen. Allow it in the browser and try again.', {
-                      type: 'error',
-                    })
-                  }
-                }}
-              >
-                Return to fullscreen
-              </button>
-            )}
-          </div>
-        </div>
-      ) : null}
     </>
   )
 }
