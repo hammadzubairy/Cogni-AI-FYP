@@ -234,6 +234,7 @@ def test_all_openapi_routes_reachable(client, hit_routes):
     # Explicit ordered calls — ensure each OpenAPI path is hit at least once.
     planned: list[tuple[str, str, dict | None, dict | None]] = [
         ("GET", "/api/health", None, None),
+        ("GET", "/api/ocr/health", None, None),
         ("GET", "/api/public/config", None, None),
         ("GET", "/api/public/departments", None, None),
         ("POST", "/api/auth/login", None, {"email": "admin@cogni.pk", "password": WORLD_PASSWORD, "role": "admin"}),
@@ -256,6 +257,7 @@ def test_all_openapi_routes_reachable(client, hit_routes):
             "current_term": "T1",
         }),
         ("GET", "/api/auth/me", admin, None),
+        ("POST", "/api/ocr/url", admin, {"url": "http://127.0.0.1/"}),
         ("GET", "/api/admin/users", admin, None),
         ("GET", "/api/admin/onboarding", admin, None),
         ("GET", "/api/admin/llm-status", admin, None),
@@ -338,6 +340,8 @@ def test_all_openapi_routes_reachable(client, hit_routes):
         ("POST", f"/api/exams/{pending_id}/approve", hod, {}),
         ("POST", f"/api/exams/{return_id}/return", hod, {"comment": "coverage return note"}),
         ("GET", f"/api/exams/{pending_id}/checks", hod, None),
+        ("GET", f"/api/exams/{pending_id}/pdf", teacher, None),
+        ("GET", f"/api/exams/{pending_id}/pdf", hod, None),
         ("POST", f"/api/exams/{pending_id}/publish", teacher, None),
         ("POST", f"/api/exams/{pending_id}/close", teacher, None),
         ("POST", f"/api/exams/{quiz_id}/attempts", student_b, None),
@@ -348,6 +352,7 @@ def test_all_openapi_routes_reachable(client, hit_routes):
             else "x",
         }),
         ("POST", f"/api/attempts/{attempt_id}/submit", student, None),
+        ("POST", f"/api/attempts/{attempt_id}/forfeit", student, {"reason": "exit"}),
         ("GET", "/api/attempts/mine", student, None),
         ("GET", f"/api/attempts/{attempt_id}", student, None),
         ("GET", f"/api/exams/{quiz_id}/results", teacher, None),
@@ -380,6 +385,15 @@ def test_all_openapi_routes_reachable(client, hit_routes):
         resp = client.request(method, path, **kwargs)
         if resp.status_code >= 500:
             errors.append(f"{method} {path} -> {resp.status_code} {resp.text[:200]}")
+
+    # Multipart OCR route (JSON body would 422 before the handler marks the path).
+    ocr_file = client.post(
+        "/api/ocr/file",
+        files={"file": ("bad.exe", b"MZ", "application/octet-stream")},
+        headers=admin,
+    )
+    if ocr_file.status_code >= 500:
+        errors.append(f"POST /api/ocr/file -> {ocr_file.status_code} {ocr_file.text[:200]}")
 
     assert not errors, "\n".join(errors)
 

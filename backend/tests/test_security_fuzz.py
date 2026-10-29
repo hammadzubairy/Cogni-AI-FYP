@@ -250,7 +250,7 @@ def test_concurrent_submit_idempotent(client):
     assert all(s < 500 for s in statuses), statuses
     assert all(s == 200 for s in statuses), statuses
     bodies = [r.json() for r in results]
-    assert all(b == {"status": "submitted"} for b in bodies)
+    assert all(b.get("status") == "submitted" for b in bodies)
 
     mine = client.get(f"/api/attempts/{attempt_id}", headers=student).json()
     assert mine["status"] == "submitted"

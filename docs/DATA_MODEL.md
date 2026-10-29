@@ -24,7 +24,7 @@ Email verification tokens: `email_verifications` — `token_hash` (unique), `use
 `qid (uuid), type (string label, e.g. MCQ|Short Questions|Long Questions|custom), format (mcq|written; derived for legacy docs), bloom (Remember|Understand|Apply|Analyze|Evaluate|Create), topic, clo, text, options[]|null, answer_index|null, model_answer, keywords[{label,variants[]}], marks, source_chunk_idx|null`
 
 ## attempts
-`id, exam_id, student_id, status (in_progress|submitted), started_at, submitted_at|null, answers{qid: int|str}, results{qid:{score,max,similarity,key_points_hit[],key_points_missed[],reason,ai_probability}}, flags{qid: cleared|discuss}, overrides{qid:number}`
+`id, exam_id, student_id, status (in_progress|submitted), started_at, submitted_at|null, answers{qid: int|str}, results{qid:{score,max,similarity,key_points_hit[],key_points_missed[],reason,ai_probability}}, flags{qid: cleared|discuss}, overrides{qid:number}, end_reason (manual|time_up|exit|violations)|null, violation_count, integrity_events[{type, at}]`
 
 ## requests
 `id, hod_id, teacher_id, class_id, kind, due, note, status (open|submitted|approved), exam_id|null`

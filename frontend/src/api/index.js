@@ -2,7 +2,7 @@
  * One named function per API endpoint (docs/API.md + exam lifecycle routes).
  * Components must use these helpers — never call fetch directly.
  */
-import { del, get, patch, post, put, upload } from './client'
+import { ApiError, del, get, getToken, patch, post, put, upload } from './client'
 
 function qs(params) {
   if (!params) return ''
@@ -14,6 +14,29 @@ function qs(params) {
 /* ---------- health ---------- */
 export function getHealth() {
   return get('/health', { skipAuth: true })
+}
+
+/* ---------- OCR Studio ---------- */
+export function ocrHealth() {
+  return get('/ocr/health', { skipAuth: true })
+}
+
+export function ocrFile(file, options = {}) {
+  const fd = new FormData()
+  fd.append('file', file)
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), options.timeoutMs || 180_000)
+  return upload('/ocr/file', fd, { signal: ctrl.signal, ...options }).finally(() =>
+    clearTimeout(timer),
+  )
+}
+
+export function ocrUrl(url, options = {}) {
+  const ctrl = new AbortController()
+  const timer = setTimeout(() => ctrl.abort(), options.timeoutMs || 120_000)
+  return post('/ocr/url', { url }, { signal: ctrl.signal, ...options }).finally(() =>
+    clearTimeout(timer),
+  )
 }
 
 /* ---------- auth ---------- */
@@ -193,6 +216,45 @@ export function getExam(id) {
   return get(`/exams/${id}`)
 }
 
+/** Download student-facing exam PDF (teacher/HOD). Triggers a browser file save. */
+export async function downloadExamPdf(id) {
+  const API_BASE = String(import.meta.env.VITE_API_BASE || '').replace(/\/$/, '')
+  const apiPath = `/api/exams/${id}/pdf`
+  const url = API_BASE ? `${API_BASE}${apiPath}` : apiPath
+  const headers = new Headers()
+  const token = getToken()
+  if (token) headers.set('Authorization', `Bearer ${token}`)
+  let res
+  try {
+    res = await fetch(url, { headers })
+  } catch {
+    throw new ApiError(0, 'NETWORK_ERROR', 'Network error. Check your connection and try again.')
+  }
+  if (!res.ok) {
+    let message = 'Could not download PDF.'
+    try {
+      const body = await res.json()
+      if (typeof body?.detail === 'string') message = body.detail
+    } catch {
+      /* ignore */
+    }
+    throw new ApiError(res.status, 'ERROR', message)
+  }
+  const blob = await res.blob()
+  let filename = 'exam.pdf'
+  const cd = res.headers.get('Content-Disposition') || ''
+  const m = /filename="?([^";]+)"?/i.exec(cd)
+  if (m) filename = m[1]
+  const href = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = href
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(href)
+}
+
 export function patchExam(id, body) {
   return patch(`/exams/${id}`, body)
 }
@@ -268,8 +330,49 @@ export function putAttemptAnswer(attemptId, qid, value) {
   return put(`/attempts/${attemptId}/answers`, { qid, value })
 }
 
-export function submitAttempt(attemptId) {
-  return post(`/attempts/${attemptId}/submit`)
+export function submitAttempt(attemptId, body = {}) {
+  const payload = {
+    end_reason: body.end_reason || 'manual',
+    integrity_events: body.integrity_events || [],
+    violation_count: body.violation_count ?? null,
+  }
+  return post(`/attempts/${attemptId}/submit`, payload)
+}
+
+export function forfeitAttempt(attemptId, body = {}) {
+  const payload = {
+    reason: body.reason || 'exit',
+    integrity_events: body.integrity_events || [],
+    violation_count: body.violation_count ?? null,
+  }
+  return post(`/attempts/${attemptId}/forfeit`, payload)
+}
+
+/** Best-effort forfeit when the tab is closing (keepalive; may not await). */
+export function forfeitAttemptKeepalive(attemptId, body = {}) {
+  const token = getToken()
+  if (!token || !attemptId) return
+  const apiPath = `/api/attempts/${attemptId}/forfeit`
+  const API_BASE = String(import.meta.env.VITE_API_BASE || '').replace(/\/$/, '')
+  const url = API_BASE ? `${API_BASE}${apiPath}` : apiPath
+  const payload = {
+    reason: body.reason || 'exit',
+    integrity_events: body.integrity_events || [],
+    violation_count: body.violation_count ?? null,
+  }
+  try {
+    fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(payload),
+      keepalive: true,
+    }).catch(() => {})
+  } catch {
+    /* ignore */
+  }
 }
 
 export function listMyAttempts({ exam_id } = {}) {

@@ -13,17 +13,12 @@ import { useToast } from './Toast'
 import Spinner from './Spinner'
 import EmptyState from './EmptyState'
 
-function NotificationDrawer({ open, items, unread, loading, error, onMarkAll, onNote }) {
+function NotificationDrawer({ open, items, loading, error, onNote }) {
   if (!open) return null
   return (
     <div className="popover" role="region" aria-label="Notifications">
       <div className="dh">
         <b>Notifications</b>
-        {unread ? (
-          <button type="button" className="btn ghost small" onClick={onMarkAll}>
-            Mark all read
-          </button>
-        ) : null}
       </div>
       <div className="scroll">
         {loading && !items.length ? (
@@ -35,12 +30,11 @@ function NotificationDrawer({ open, items, unread, loading, error, onMarkAll, on
             <button
               key={n.id}
               type="button"
-              className={`note ${n.read ? '' : 'unread'}`}
+              className="note"
               onClick={() => onNote(n)}
             >
               <span className="ud" aria-hidden="true" />
               <span>
-                {n.read ? null : <span className="sr-only">Unread: </span>}
                 {n.text}
                 <span className="t">{formatShortDate(n.created_at)}</span>
               </span>
@@ -144,6 +138,20 @@ export default function AppShell({ children }) {
     document.title = `${cur ? `${cur.label} · ` : ''}Cogni.ai`
   }, [active, R.nav])
 
+  // Opening the panel counts as seen — clear unread badge immediately.
+  useEffect(() => {
+    if (!bellOpen || notes.unreadCount <= 0) return undefined
+    let cancelled = false
+    notes.markAllRead().catch((err) => {
+      if (!cancelled) {
+        toast(err?.message || 'Could not mark notifications read', { type: 'error' })
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [bellOpen, notes.unreadCount, notes.markAllRead, toast])
+
   if (!user) return null
 
   const badgeFor = (key) => {
@@ -153,6 +161,7 @@ export default function AppShell({ children }) {
   }
 
   const onNav = (to) => {
+    if (document.body.classList.contains('exam-mode')) return
     setNavOpen(false)
     setBellOpen(false)
     setMenuOpen(false)
@@ -160,29 +169,16 @@ export default function AppShell({ children }) {
   }
 
   const onSignOut = () => {
+    if (document.body.classList.contains('exam-mode')) return
     logout()
     navigate('/login', { replace: true })
   }
 
-  const onNote = async (n) => {
-    try {
-      if (!n.read) await notes.markRead(n.id)
-    } catch {
-      /* still navigate */
-    }
+  const onNote = (n) => {
+    if (document.body.classList.contains('exam-mode')) return
     setBellOpen(false)
     const path = notificationPath(n.link)
     if (path) navigate(path)
-    else toast('Marked as read')
-  }
-
-  const onMarkAll = async () => {
-    try {
-      await notes.markAllRead()
-      toast('All notifications marked as read')
-    } catch (err) {
-      toast(err?.message || 'Could not mark notifications read', { type: 'error' })
-    }
   }
 
   const showMockLlmBanner = llmStatus?.provider === 'mock'
@@ -299,10 +295,8 @@ export default function AppShell({ children }) {
               <NotificationDrawer
                 open={bellOpen}
                 items={notes.items}
-                unread={unread}
                 loading={notes.loading}
                 error={notes.error}
-                onMarkAll={onMarkAll}
                 onNote={onNote}
               />
             </div>

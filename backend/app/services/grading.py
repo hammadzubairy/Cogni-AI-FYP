@@ -304,7 +304,13 @@ def _grade_mcq(question: dict, answer) -> dict:
     }
 
 
-async def finalize_attempt(attempt: dict) -> dict:
+async def finalize_attempt(
+    attempt: dict,
+    *,
+    end_reason: str | None = None,
+    integrity_events: list[dict] | None = None,
+    violation_count: int | None = None,
+) -> dict:
     """Grade every answer and mark the attempt submitted. Used both for an
     explicit student submit and for auto-closing an attempt whose deadline
     has passed (lazily on read, or when the teacher closes the exam)."""
@@ -312,13 +318,23 @@ async def finalize_attempt(attempt: dict) -> dict:
     exam = await db.exams.find_one({"_id": oid(attempt["exam_id"])})
     results = await grade_attempt_answers(exam, attempt.get("answers", {})) if exam else {}
     now = datetime.now(UTC)
-    await db.attempts.update_one(
-        {"_id": attempt["_id"]},
-        {"$set": {"status": "submitted", "submitted_at": now, "results": results}},
-    )
+    update: dict = {"status": "submitted", "submitted_at": now, "results": results}
+    if end_reason is not None:
+        update["end_reason"] = end_reason
+    if integrity_events is not None:
+        update["integrity_events"] = integrity_events
+    if violation_count is not None:
+        update["violation_count"] = violation_count
+    await db.attempts.update_one({"_id": attempt["_id"]}, {"$set": update})
     attempt["status"] = "submitted"
     attempt["submitted_at"] = now
     attempt["results"] = results
+    if end_reason is not None:
+        attempt["end_reason"] = end_reason
+    if integrity_events is not None:
+        attempt["integrity_events"] = integrity_events
+    if violation_count is not None:
+        attempt["violation_count"] = violation_count
     return attempt
 
 

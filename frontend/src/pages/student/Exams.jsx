@@ -139,13 +139,20 @@ export default function Exams({ classId = null }) {
                     {x.duration_min} min
                   </div>
                 </div>
-                <button
-                  type="button"
-                  className="btn small primary"
-                  onClick={() => navigate(`/app/student/exams/${x.id}/take`)}
-                >
-                  {at?.status === 'in_progress' ? 'Resume' : 'Start exam'}
-                </button>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                  <button
+                    type="button"
+                    className="btn small primary"
+                    onClick={() => navigate(`/app/student/exams/${x.id}/take`)}
+                  >
+                    {at?.status === 'in_progress' ? 'Resume' : 'Start exam'}
+                  </button>
+                  {at?.status === 'in_progress' ? (
+                    <span className="small" style={{ color: 'var(--color-muted-foreground)', textAlign: 'right' }}>
+                      Continues in fullscreen lock
+                    </span>
+                  ) : null}
+                </div>
               </div>
             )
           })

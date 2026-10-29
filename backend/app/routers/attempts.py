@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Query
 
 from app.core.deps import CurrentUser, require_role
-from app.schemas.attempts import AnswerIn, FlagIn, OverrideIn, ThresholdIn
+from app.schemas.attempts import AnswerIn, FlagIn, ForfeitIn, OverrideIn, SubmitIn, ThresholdIn
 from app.services import attempts as attempt_service
 from app.services import feedback as feedback_service
 
@@ -21,8 +21,35 @@ async def save_answer(
 
 
 @router.post("/api/attempts/{attempt_id}/submit")
-async def submit_attempt(attempt_id: str, student: CurrentUser = Depends(require_role("student"))):
-    return await attempt_service.submit_attempt(student, attempt_id)
+async def submit_attempt(
+    attempt_id: str,
+    payload: SubmitIn | None = None,
+    student: CurrentUser = Depends(require_role("student")),
+):
+    body = payload or SubmitIn()
+    return await attempt_service.submit_attempt(
+        student,
+        attempt_id,
+        end_reason=body.end_reason,
+        integrity_events=body.integrity_events,
+        violation_count=body.violation_count,
+    )
+
+
+@router.post("/api/attempts/{attempt_id}/forfeit")
+async def forfeit_attempt(
+    attempt_id: str,
+    payload: ForfeitIn | None = None,
+    student: CurrentUser = Depends(require_role("student")),
+):
+    body = payload or ForfeitIn()
+    return await attempt_service.forfeit_attempt(
+        student,
+        attempt_id,
+        reason=body.reason,
+        integrity_events=body.integrity_events,
+        violation_count=body.violation_count,
+    )
 
 
 @router.get("/api/attempts/mine")

@@ -43,7 +43,7 @@ async def auto_close_if_expired(attempt: dict, exam: dict | None) -> dict:
     if exam is None or attempt["status"] != "in_progress":
         return attempt
     if datetime.now(UTC) > _deadline(attempt, exam) + timedelta(seconds=GRACE_SECONDS):
-        return await finalize_attempt(attempt)
+        return await finalize_attempt(attempt, end_reason="time_up")
     return attempt
 
 
@@ -93,6 +93,9 @@ async def start_attempt(student: CurrentUser, exam_id: str) -> dict:
         "results": {},
         "flags": {},
         "overrides": {},
+        "end_reason": None,
+        "violation_count": 0,
+        "integrity_events": [],
     }
     result = await db.attempts.insert_one(doc)
     doc["_id"] = result.inserted_id
@@ -130,7 +133,27 @@ async def save_answer(student: CurrentUser, attempt_id: str, qid: str, value) ->
     return to_out(attempt)
 
 
-async def submit_attempt(student: CurrentUser, attempt_id: str) -> dict:
+def _integrity_event_dicts(events: list | None) -> list[dict]:
+    if not events:
+        return []
+    out = []
+    for event in events:
+        if hasattr(event, "model_dump"):
+            data = event.model_dump()
+        else:
+            data = dict(event)
+        out.append({"type": data["type"], "at": data["at"]})
+    return out
+
+
+async def submit_attempt(
+    student: CurrentUser,
+    attempt_id: str,
+    *,
+    end_reason: str = "manual",
+    integrity_events: list | None = None,
+    violation_count: int | None = None,
+) -> dict:
     db = get_db()
     attempt = await _get_attempt_or_404(db, attempt_id)
     if attempt["student_id"] != student.id:
@@ -138,9 +161,43 @@ async def submit_attempt(student: CurrentUser, attempt_id: str) -> dict:
     exam = await db.exams.find_one({"_id": oid(attempt["exam_id"])})
     attempt = await auto_close_if_expired(attempt, exam)
     if attempt["status"] == "in_progress":
-        attempt = await finalize_attempt(attempt)
+        events = _integrity_event_dicts(integrity_events)
+        existing_events = list(attempt.get("integrity_events") or [])
+        merged_events = existing_events + events if events else existing_events or None
+        count = violation_count
+        if count is None and attempt.get("violation_count") is not None:
+            count = attempt.get("violation_count")
+        attempt = await finalize_attempt(
+            attempt,
+            end_reason=end_reason,
+            integrity_events=merged_events,
+            violation_count=count,
+        )
     await log_activity(student, f"Submitted '{exam['title']}'" if exam else "Submitted an exam")
-    return {"status": "submitted"}
+    return {"status": "submitted", "end_reason": attempt.get("end_reason") or end_reason}
+
+
+async def forfeit_attempt(
+    student: CurrentUser,
+    attempt_id: str,
+    *,
+    reason: str = "exit",
+    integrity_events: list | None = None,
+    violation_count: int | None = None,
+) -> dict:
+    """End the attempt early (exit button or max lock violations). Idempotent."""
+    events = list(integrity_events or [])
+    events.append({"type": reason, "at": datetime.now(UTC)})
+    count = violation_count
+    if count is None and reason == "violations":
+        count = 3
+    return await submit_attempt(
+        student,
+        attempt_id,
+        end_reason=reason,
+        integrity_events=events,
+        violation_count=count,
+    )
 
 
 async def get_my_attempts(student: CurrentUser, exam_id: str | None) -> list[dict]:
@@ -284,6 +341,8 @@ async def get_attempt_detail(teacher: CurrentUser, attempt_id: str) -> dict:
         "student_name": student["name"] if student else "Unknown",
         "status": attempt["status"],
         "submitted_at": attempt.get("submitted_at"),
+        "end_reason": attempt.get("end_reason"),
+        "violation_count": attempt.get("violation_count", 0),
         "ai_threshold": exam["ai_threshold"],
         "ai_detector": get_ai_detector().label,
         "questions": questions,

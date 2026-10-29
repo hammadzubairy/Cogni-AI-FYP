@@ -37,6 +37,9 @@ ALLOWED_ROLES: dict[tuple[str, str], set[str]] = {
     ("GET", "/api/auth/me"): {"student", "teacher", "hod", "admin"},
     ("POST", "/api/auth/change-password"): {"student", "teacher", "hod", "admin"},
     ("POST", "/api/auth/switch-role"): {"student", "teacher", "hod", "admin"},
+    ("GET", "/api/ocr/health"): {"anonymous", "student", "teacher", "hod", "admin"},
+    ("POST", "/api/ocr/file"): {"student", "teacher", "hod", "admin"},
+    ("POST", "/api/ocr/url"): {"student", "teacher", "hod", "admin"},
     ("GET", "/api/classes"): {"student", "teacher", "hod", "admin"},
     ("GET", "/api/exams"): {"student", "teacher", "hod", "admin"},
     ("GET", "/api/notifications"): {"student", "teacher", "hod", "admin"},
@@ -93,6 +96,7 @@ ALLOWED_ROLES: dict[tuple[str, str], set[str]] = {
     ("POST", "/api/exams/{exam_id}/attempts"): {"student"},
     ("PUT", "/api/attempts/{attempt_id}/answers"): {"student"},
     ("POST", "/api/attempts/{attempt_id}/submit"): {"student"},
+    ("POST", "/api/attempts/{attempt_id}/forfeit"): {"student"},
     ("GET", "/api/attempts/mine"): {"student"},
     ("GET", "/api/attempts/{attempt_id}"): {"student"},
     ("POST", "/api/materials/{material_id}/ask"): {"student"},
@@ -109,6 +113,7 @@ ALLOWED_ROLES: dict[tuple[str, str], set[str]] = {
     # ---- mixed ----
     ("GET", "/api/requests"): {"teacher", "hod"},
     ("GET", "/api/exams/{exam_id}/checks"): {"teacher", "hod"},
+    ("GET", "/api/exams/{exam_id}/pdf"): {"teacher", "hod"},
     ("GET", "/api/attempts/{attempt_id}/feedback"): {"student", "teacher"},
 }
 
@@ -123,6 +128,7 @@ PUBLIC_ROUTES = {
     ("POST", "/api/auth/register"),
     ("POST", "/api/auth/forgot"),
     ("POST", "/api/auth/reset"),
+    ("GET", "/api/ocr/health"),
 }
 
 # Teacher lifecycle ops that should target a published exam (expect 400/409).
@@ -248,6 +254,7 @@ def _payload_for(method: str, path: str, world: dict) -> dict | None:
         ("POST", "/api/auth/switch-role"): {"role": "admin"},
         ("POST", "/api/auth/verify-email"): {"token": "not-a-real-token"},
         ("POST", "/api/auth/resend-verification"): {"email": PERSONAS["admin"]},
+        ("POST", "/api/ocr/url"): {"url": "http://127.0.0.1/"},
         ("POST", "/api/admin/users"): {
             "name": "Temp User",
             "email": "rbac.temp@cogni.pk",

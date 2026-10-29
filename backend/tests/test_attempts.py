@@ -108,11 +108,13 @@ def test_full_grade_override_release_feedback_flow(client):
 
     submit = client.post(f"/api/attempts/{attempt_id}/submit", headers=_auth(client, STUDENT_A))
     assert submit.status_code == 200
-    assert submit.json() == {"status": "submitted"}
+    assert submit.json()["status"] == "submitted"
+    assert submit.json()["end_reason"] == "manual"
 
     # student cannot see scores before release
     mine = client.get(f"/api/attempts/{attempt_id}", headers=_auth(client, STUDENT_A)).json()
     assert mine["results"] == {}
+    assert mine["end_reason"] == "manual"
 
     feedback_before_release = client.get(
         f"/api/attempts/{attempt_id}/feedback", headers=_auth(client, STUDENT_A)
@@ -265,7 +267,88 @@ async def test_deadline_is_enforced(client):
     # submit on an already-auto-closed attempt is a harmless no-op
     submit = client.post(f"/api/attempts/{attempt_id}/submit", headers=_auth(client, STUDENT_A))
     assert submit.status_code == 200
-    assert submit.json() == {"status": "submitted"}
+    assert submit.json()["status"] == "submitted"
+    assert submit.json()["end_reason"] == "time_up"
+
+
+def test_forfeit_exit_consumes_only_attempt(client):
+    c1_id = _class_id(client, "CS-201-A", TEACHER_A)
+    material_id = _first_material_id(client, c1_id, TEACHER_A)
+    exam = _publish_quiz(
+        client, class_id=c1_id, material_id=material_id, title="Forfeit exit quiz"
+    )
+    exam_id = exam["id"]
+
+    start = client.post(f"/api/exams/{exam_id}/attempts", headers=_auth(client, STUDENT_A))
+    assert start.status_code == 201
+    attempt_id = start.json()["id"]
+
+    forfeit = client.post(
+        f"/api/attempts/{attempt_id}/forfeit",
+        json={"reason": "exit", "violation_count": 0, "integrity_events": []},
+        headers=_auth(client, STUDENT_A),
+    )
+    assert forfeit.status_code == 200
+    assert forfeit.json()["status"] == "submitted"
+    assert forfeit.json()["end_reason"] == "exit"
+
+    mine = client.get(f"/api/attempts/{attempt_id}", headers=_auth(client, STUDENT_A)).json()
+    assert mine["status"] == "submitted"
+    assert mine["end_reason"] == "exit"
+
+    again = client.post(f"/api/exams/{exam_id}/attempts", headers=_auth(client, STUDENT_A))
+    assert again.status_code == 400
+
+    # idempotent forfeit / submit
+    again_forfeit = client.post(
+        f"/api/attempts/{attempt_id}/forfeit",
+        json={"reason": "exit"},
+        headers=_auth(client, STUDENT_A),
+    )
+    assert again_forfeit.status_code == 200
+    assert again_forfeit.json()["status"] == "submitted"
+    assert again_forfeit.json()["end_reason"] == "exit"
+
+
+def test_forfeit_violations_records_count(client):
+    c1_id = _class_id(client, "CS-201-A", TEACHER_A)
+    material_id = _first_material_id(client, c1_id, TEACHER_A)
+    exam = _publish_quiz(
+        client, class_id=c1_id, material_id=material_id, title="Forfeit violations quiz"
+    )
+    exam_id = exam["id"]
+
+    start = client.post(f"/api/exams/{exam_id}/attempts", headers=_auth(client, STUDENT_B))
+    assert start.status_code == 201
+    attempt_id = start.json()["id"]
+
+    at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+    forfeit = client.post(
+        f"/api/attempts/{attempt_id}/forfeit",
+        json={
+            "reason": "violations",
+            "violation_count": 3,
+            "integrity_events": [
+                {"type": "tab_hide", "at": at},
+                {"type": "fullscreen_exit", "at": at},
+                {"type": "window_blur", "at": at},
+            ],
+        },
+        headers=_auth(client, STUDENT_B),
+    )
+    assert forfeit.status_code == 200
+    assert forfeit.json()["end_reason"] == "violations"
+
+    mine = client.get(f"/api/attempts/{attempt_id}", headers=_auth(client, STUDENT_B)).json()
+    assert mine["end_reason"] == "violations"
+    assert mine["violation_count"] == 3
+    assert len(mine["integrity_events"]) >= 3
+
+    detail = client.get(
+        f"/api/attempts/{attempt_id}/detail", headers=_auth(client, TEACHER_A)
+    ).json()
+    assert detail["end_reason"] == "violations"
+    assert detail["violation_count"] == 3
 
 
 def test_grading_prompt_wraps_student_answer_in_tags_and_marks_it_untrusted():

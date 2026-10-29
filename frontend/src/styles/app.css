@@ -213,6 +213,41 @@ td select,.filters select,.filters input{border:1px solid var(--color-input);bor
 .decision .acts{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
 .decision .acts .btn{flex:1}
 
+/* ---------- Exam lock (body.exam-mode) ---------- */
+body.exam-mode .sidebar,
+body.exam-mode .menu-btn,
+body.exam-mode .scrim,
+body.exam-mode .demo-banner{display:none!important}
+body.exam-mode .app{grid-template-columns:1fr}
+body.exam-mode .topnav .tlogo{pointer-events:none}
+body.exam-mode .topnav .pop-wrap,
+body.exam-mode .topnav .theme-btn{opacity:.45;pointer-events:none}
+body.exam-mode .main{padding-block:16px 48px}
+.exam-lock-overlay{
+  position:fixed;inset:0;z-index:2000;
+  display:flex;align-items:center;justify-content:center;
+  padding:24px;background:rgba(10,12,16,.78);
+  backdrop-filter:blur(2px);
+}
+.exam-lock-card{
+  width:min(440px,100%);
+  background:var(--color-card);
+  border:1px solid var(--color-border);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow-lg);
+  padding:28px 24px;
+  text-align:center;
+}
+.exam-lock-card h2{font-size:22px;margin:0 0 10px}
+.exam-lock-card p{margin:0 0 14px;color:var(--color-muted-foreground);line-height:1.45}
+.exam-lock-warn{color:var(--color-destructive)!important;font-weight:600}
+.btn.danger{
+  background:var(--color-destructive);
+  color:#fff;
+  border-color:transparent;
+}
+.btn.danger:hover{filter:brightness(0.95)}
+
 /* ---------- Exam taking ---------- */
 .exambar{position:sticky;top:var(--topbar-h);z-index:20;display:flex;align-items:center;gap:14px 20px;flex-wrap:wrap;background:var(--color-card);border:1px solid var(--color-border);border-radius:var(--radius);padding:10px 16px;margin-bottom:18px;box-shadow:var(--shadow-md)}
 .exambar .tl{display:flex;align-items:center;gap:8px}

@@ -9,6 +9,11 @@ import { useModal } from '../../components/Modal'
 import PageTop from '../../components/PageTop'
 import Pill from '../../components/Pill'
 import { useToast } from '../../components/Toast'
+import useExamLock, {
+  exitExamFullscreen,
+  MAX_EXAM_VIOLATIONS,
+  requestExamFullscreen,
+} from '../../hooks/useExamLock'
 import {
   answeredCount,
   formatMmSs,
@@ -47,6 +52,13 @@ function SaveStatus({ status }) {
   return null
 }
 
+function violationLabel(type) {
+  if (type === 'tab_hide') return 'tab switch or minimize'
+  if (type === 'window_blur') return 'switched to another window'
+  if (type === 'fullscreen_exit') return 'left fullscreen'
+  return 'left the exam'
+}
+
 export default function TakeExam() {
   const { id: examId } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -69,6 +81,7 @@ export default function TakeExam() {
   const [offline, setOffline] = useState(typeof navigator !== 'undefined' ? !navigator.onLine : false)
   const [submitting, setSubmitting] = useState(false)
   const [starting, setStarting] = useState(false)
+  const [fsError, setFsError] = useState('')
 
   const answersRef = useRef({})
   const attemptRef = useRef(null)
@@ -77,6 +90,8 @@ export default function TakeExam() {
   const warnedRef = useRef({})
   const submittingRef = useRef(false)
   const titleRef = useRef(null)
+  const lockPayloadRef = useRef(() => ({ violation_count: 0, integrity_events: [] }))
+  const disarmRef = useRef(() => {})
 
   useEffect(() => {
     answersRef.current = answers
@@ -99,6 +114,87 @@ export default function TakeExam() {
     },
     [searchParams, setSearchParams],
   )
+
+  const endExam = useCallback(
+    async ({ endReason, toastMsg, forfeit = false }) => {
+      if (submittingRef.current) return
+      const at = attemptRef.current
+      if (!at || at.status === 'submitted') return
+      submittingRef.current = true
+      setSubmitting(true)
+      disarmRef.current()
+      try {
+        Object.values(saveTimers.current).forEach((t) => clearTimeout(t))
+        saveTimers.current = {}
+        await Promise.all(
+          Object.entries(answersRef.current).map(async ([qid, value]) => {
+            try {
+              await api.putAttemptAnswer(at.id, qid, value)
+            } catch {
+              /* best effort */
+            }
+          }),
+        )
+        const integrity = lockPayloadRef.current()
+        if (forfeit) {
+          await api.forfeitAttempt(at.id, {
+            reason: endReason === 'violations' ? 'violations' : 'exit',
+            ...integrity,
+          })
+        } else {
+          await api.submitAttempt(at.id, {
+            end_reason: endReason || 'manual',
+            ...integrity,
+          })
+        }
+        try {
+          await exitExamFullscreen()
+        } catch {
+          /* ignore */
+        }
+        setPhase('submitted')
+        toast(toastMsg || 'Exam submitted')
+        navigate(`/app/student/attempts/${at.id}/done`, { replace: true })
+      } catch (err) {
+        submittingRef.current = false
+        setSubmitting(false)
+        toast(err instanceof ApiError ? err.message : 'Could not submit. Try again.', {
+          type: 'error',
+        })
+      }
+    },
+    [navigate, toast],
+  )
+
+  const doSubmit = useCallback(
+    (auto) =>
+      endExam({
+        endReason: auto ? 'time_up' : 'manual',
+        toastMsg: auto ? 'Time is up. Your answers have been submitted.' : 'Exam submitted',
+        forfeit: false,
+      }),
+    [endExam],
+  )
+
+  const onMaxViolations = useCallback(
+    () =>
+      endExam({
+        endReason: 'violations',
+        toastMsg: 'Too many lock violations. Your exam has been submitted and cannot be retaken.',
+        forfeit: true,
+      }),
+    [endExam],
+  )
+
+  const lock = useExamLock({
+    active: phase === 'taking' && !submitting,
+    onMaxViolations,
+  })
+
+  useEffect(() => {
+    lockPayloadRef.current = lock.getIntegrityPayload
+    disarmRef.current = lock.disarm
+  }, [lock.getIntegrityPayload, lock.disarm])
 
   const load = useCallback(async () => {
     setPhase('loading')
@@ -169,55 +265,35 @@ export default function TakeExam() {
     }
   }, [])
 
-  /* beforeunload while in progress */
+  /* Warn on hard tab close; do not auto-forfeit on refresh (resume + re-lock). */
   useEffect(() => {
     if (phase !== 'taking') return undefined
-    const handler = (e) => {
+    const onBeforeUnload = (e) => {
       e.preventDefault()
       e.returnValue = ''
     }
-    window.addEventListener('beforeunload', handler)
-    return () => window.removeEventListener('beforeunload', handler)
+    window.addEventListener('beforeunload', onBeforeUnload)
+    return () => window.removeEventListener('beforeunload', onBeforeUnload)
   }, [phase])
 
-  const doSubmit = useCallback(
-    async (auto) => {
-      if (submittingRef.current) return
-      const at = attemptRef.current
-      if (!at || at.status === 'submitted') return
-      submittingRef.current = true
-      setSubmitting(true)
-      try {
-        // Flush pending saves
-        Object.values(saveTimers.current).forEach((t) => clearTimeout(t))
-        saveTimers.current = {}
-        await Promise.all(
-          Object.entries(answersRef.current).map(async ([qid, value]) => {
-            try {
-              await api.putAttemptAnswer(at.id, qid, value)
-            } catch {
-              /* best effort */
-            }
-          }),
-        )
-        await api.submitAttempt(at.id)
-        setPhase('submitted')
-        if (auto) {
-          toast('Time is up. Your answers have been submitted.')
-        } else {
-          toast('Exam submitted')
-        }
-        navigate(`/app/student/attempts/${at.id}/done`, { replace: true })
-      } catch (err) {
-        submittingRef.current = false
-        setSubmitting(false)
-        toast(err instanceof ApiError ? err.message : 'Could not submit. Try again.', {
-          type: 'error',
-        })
-      }
-    },
-    [navigate, toast],
-  )
+  /* Block in-app link navigation while locked (sidebar is CSS-hidden; crumbs/other links) */
+  useEffect(() => {
+    if (phase !== 'taking') return undefined
+    const onClick = (e) => {
+      const a = e.target.closest?.('a[href]')
+      if (!a) return
+      const href = a.getAttribute('href') || ''
+      if (!href || href.startsWith('#') || href.startsWith('javascript:')) return
+      if (href.includes(`/exams/${examId}/take`)) return
+      e.preventDefault()
+      e.stopPropagation()
+      askExit()
+    }
+    document.addEventListener('click', onClick, true)
+    return () => document.removeEventListener('click', onClick, true)
+    // askExit is stable enough via refs; eslint intentionally omitted
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, examId])
 
   /* countdown timer */
   useEffect(() => {
@@ -259,7 +335,6 @@ export default function TakeExam() {
           setSaveStatus('saved')
         } catch (err) {
           setSaveStatus('error')
-          // Retry once after a short delay
           await new Promise((r) => setTimeout(r, 1200))
           try {
             const updated = await api.putAttemptAnswer(at.id, qid, value)
@@ -303,7 +378,17 @@ export default function TakeExam() {
 
   async function onStart() {
     setStarting(true)
+    setFsError('')
     try {
+      try {
+        await requestExamFullscreen()
+      } catch {
+        setFsError(
+          'Fullscreen is required to start. Allow fullscreen, or use a desktop browser that supports it.',
+        )
+        setStarting(false)
+        return
+      }
       const started = await api.startAttempt(examId)
       const now = Date.now()
       setAttempt(started)
@@ -313,12 +398,50 @@ export default function TakeExam() {
       setReceivedAt(now)
       setPhase('taking')
       goQ(0)
-      toast(`Exam started. You have ${exam.duration_min} minutes.`)
+      toast(`Exam started. You have ${exam.duration_min} minutes. Stay in fullscreen.`)
     } catch (err) {
+      try {
+        await exitExamFullscreen()
+      } catch {
+        /* ignore */
+      }
       toast(err instanceof ApiError ? err.message : 'Could not start the exam.', { type: 'error' })
     } finally {
       setStarting(false)
     }
+  }
+
+  function askExit() {
+    if (!exam || !attempt || submittingRef.current) return
+    openModal(
+      <>
+        <h3>Exit exam?</h3>
+        <p className="small">
+          Leaving now will <b>submit your answers and use up your only attempt</b>. You will not be
+          able to retake this exam.
+        </p>
+        <div className="acts">
+          <button type="button" className="btn" onClick={closeModal}>
+            Keep working
+          </button>
+          <button
+            type="button"
+            className="btn danger"
+            disabled={submitting}
+            onClick={() => {
+              closeModal()
+              endExam({
+                endReason: 'exit',
+                toastMsg: 'You exited the exam. Your attempt has been submitted.',
+                forfeit: true,
+              })
+            }}
+          >
+            Exit and forfeit attempt
+          </button>
+        </div>
+      </>,
+    )
   }
 
   function askSubmit() {
@@ -372,7 +495,7 @@ export default function TakeExam() {
   }
 
   const crumb = useMemo(() => {
-    if (!cls) return null
+    if (!cls || phase === 'taking') return null
     return (
       <>
         <Link to="/app/student">Home</Link> <span aria-hidden="true">/</span>{' '}
@@ -381,7 +504,7 @@ export default function TakeExam() {
         <Link to={`/app/student/classes/${cls.id}?tab=exams`}>Exams</Link>
       </>
     )
-  }, [cls])
+  }, [cls, phase])
 
   if (phase === 'loading') return <ShellLoading label="Loading exam…" />
   if (phase === 'error') {
@@ -459,8 +582,15 @@ export default function TakeExam() {
             >
               <li>{mix}.</li>
               <li>
-                The timer starts when you press <b>Start exam</b> and keeps running even if you leave
-                the page.
+                The exam runs in <b>fullscreen lock</b>. Leaving the tab, another window, or
+                fullscreen counts as a violation.
+              </li>
+              <li>
+                After <b>{MAX_EXAM_VIOLATIONS} violations</b>, your answers are submitted
+                automatically and you cannot retake.
+              </li>
+              <li>
+                <b>Exit exam</b> also uses up your only attempt. You get one sitting.
               </li>
               <li>Answers save automatically. The exam submits itself when time runs out.</li>
               <li>
@@ -468,6 +598,12 @@ export default function TakeExam() {
                 by your teacher.
               </li>
             </ul>
+            {fsError ? (
+              <div className="callout red" role="alert" style={{ marginBottom: 14 }}>
+                <Icon name="alert" />
+                <div>{fsError}</div>
+              </div>
+            ) : null}
             <div className="row">
               <button
                 type="button"
@@ -499,10 +635,11 @@ export default function TakeExam() {
   const wc = wordCount(a)
   const low = left != null && left < 300
   const timerText = left == null ? '--:--' : formatMmSs(left)
+  const strikesLeft = Math.max(0, lock.maxViolations - lock.violationCount)
 
   return (
     <>
-      <PageTop crumb={crumb} title={exam.title} />
+      <PageTop title={exam.title} />
 
       {offline ? (
         <div className="callout red" role="status">
@@ -537,7 +674,10 @@ export default function TakeExam() {
               {answered} of {questions.length}
             </b>{' '}
             answered
-            <span className="hide-sm"> · answers save automatically</span>
+            <span className="hide-sm">
+              {' '}
+              · lock {lock.violationCount}/{lock.maxViolations}
+            </span>
           </div>
           <div className="bar" aria-hidden="true">
             <i
@@ -548,6 +688,14 @@ export default function TakeExam() {
             />
           </div>
         </div>
+        <button
+          type="button"
+          className="btn ghost"
+          disabled={submitting}
+          onClick={askExit}
+        >
+          Exit exam
+        </button>
         <button
           type="button"
           className="btn good"
@@ -728,6 +876,44 @@ export default function TakeExam() {
           </div>
         </aside>
       </div>
+
+      {lock.blocked ? (
+        <div className="exam-lock-overlay" role="alertdialog" aria-modal="true" aria-labelledby="exam-lock-title">
+          <div className="exam-lock-card">
+            <h2 id="exam-lock-title">Return to the exam</h2>
+            <p>
+              Detected: {violationLabel(lock.lastViolationType)}. Violations:{' '}
+              <b>
+                {lock.violationCount} / {lock.maxViolations}
+              </b>
+              .
+            </p>
+            {strikesLeft <= 1 && lock.violationCount < lock.maxViolations ? (
+              <p className="exam-lock-warn">
+                Last chance — one more violation will submit your exam permanently.
+              </p>
+            ) : null}
+            {lock.violationCount >= lock.maxViolations ? (
+              <p className="exam-lock-warn">Submitting your exam…</p>
+            ) : (
+              <button
+                type="button"
+                className="btn primary"
+                onClick={async () => {
+                  const ok = await lock.reenterFullscreen()
+                  if (!ok) {
+                    toast('Could not enter fullscreen. Allow it in the browser and try again.', {
+                      type: 'error',
+                    })
+                  }
+                }}
+              >
+                Return to fullscreen
+              </button>
+            )}
+          </div>
+        </div>
+      ) : null}
     </>
   )
 }
