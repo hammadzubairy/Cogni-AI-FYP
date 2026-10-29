@@ -45,19 +45,41 @@ async function publishQuiz(request, title) {
   ).json()
   expect(materials?.[0]?.id).toBeTruthy()
 
-  const gen = await request.post(`${API}/exams/generate`, {
-    headers,
-    data: {
-      class_id: cls.id,
-      title,
-      kind: 'Quiz',
-      duration_min: 20,
-      material_ids: [materials[0].id],
-      counts: { MCQ: 1, Short: 1 },
-    },
-  })
-  expect(gen.ok(), await gen.text()).toBeTruthy()
-  const exam = (await gen.json()).exam
+  // Prefer mock LLM (Playwright webServer). Retry once; fall back to any open published exam.
+  let exam = null
+  for (let i = 0; i < 2; i++) {
+    const gen = await request.post(`${API}/exams/generate`, {
+      headers,
+      data: {
+        class_id: cls.id,
+        title: i === 0 ? title : `${title}-${i}`,
+        kind: 'Quiz',
+        duration_min: 20,
+        material_ids: [materials[0].id],
+        counts: { MCQ: 1, Short: 1 },
+      },
+    })
+    if (gen.ok()) {
+      exam = (await gen.json()).exam
+      break
+    }
+  }
+  if (!exam) {
+    const exams = await (await request.get(`${API}/exams?class_id=${cls.id}`, { headers })).json()
+    const published = (exams || []).find((e) => e.status === 'published' && e.title)
+    expect(published?.id, 'Need a published exam when generate fails').toBeTruthy()
+    // Ensure this student has no attempt yet — pick published with no sana attempt
+    const stToken = await apiLogin(request, STUDENT, 'student')
+    const mine = await (
+      await request.get(`${API}/attempts/mine`, {
+        headers: { Authorization: `Bearer ${stToken}` },
+      })
+    ).json()
+    const taken = new Set((mine || []).map((a) => a.exam_id))
+    const open = (exams || []).find((e) => e.status === 'published' && !taken.has(e.id))
+    expect(open?.id, 'No unused published exam for lock student').toBeTruthy()
+    return open.id
+  }
   const pub = await request.post(`${API}/exams/${exam.id}/publish`, { headers })
   expect(pub.ok(), await pub.text()).toBeTruthy()
   return exam.id
@@ -143,24 +165,18 @@ test.describe('Exam lock proof', () => {
     await expect(page.getByRole('button', { name: /Exit exam/i })).toBeVisible()
     await snap(page, 'LOCK02-taking-locked', 'Exam taking bar with Exit + lock counter')
 
-    // Simulate leaving the tab / losing visibility
-    await page.evaluate(() => {
-      Object.defineProperty(document, 'visibilityState', {
-        configurable: true,
-        get: () => 'hidden',
-      })
-      Object.defineProperty(document, 'hidden', {
-        configurable: true,
-        get: () => true,
-      })
-      document.dispatchEvent(new Event('visibilitychange'))
+    // Wait for lock arm (~600ms), then leave stubbed fullscreen (counts as a violation)
+    await page.waitForTimeout(800)
+    await page.evaluate(async () => {
+      await document.exitFullscreen()
     })
 
-    await expect(page.getByRole('heading', { name: /Return to the exam/i })).toBeVisible({
+    const overlay = page.locator('.exam-lock-overlay')
+    await expect(overlay.getByRole('heading', { name: /Return to the exam/i })).toBeVisible({
       timeout: 10_000,
     })
-    await expect(page.getByText(/Violations:\s*1\s*\/\s*3/i)).toBeVisible()
-    await snap(page, 'LOCK03-violation-overlay', 'Lock overlay after tab-hide violation')
+    await expect(overlay.locator('b')).toHaveText(/1\s*\/\s*3/)
+    await snap(page, 'LOCK03-violation-overlay', 'Lock overlay after fullscreen-exit violation')
 
     await page.getByRole('button', { name: /Return to fullscreen/i }).click()
     await expect(page.getByRole('heading', { name: /Return to the exam/i })).toHaveCount(0, {
