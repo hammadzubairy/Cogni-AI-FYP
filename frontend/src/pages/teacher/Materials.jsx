@@ -395,7 +395,7 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
                 </b>
                 <span>
                   {files.length
-                    ? files.map((f) => f.name).join(' · ')
+                    ? 'Listed below — remove any you do not want, then process.'
                     : 'Upload one or more files. Scanned PDFs use OCR. Presentations and Word docs are supported.'}
                 </span>
               </label>
@@ -416,7 +416,7 @@ export default function Materials({ embedded = false, classId: fixedClassId } = 
                 <div className="file-queue" style={{ marginTop: 10 }}>
                   {files.map((f) => (
                     <div className="lrow" key={`${f.name}:${f.size}`} style={{ padding: '8px 0' }}>
-                      <div className="grow">
+                      <div className="grow" title={f.name}>
                         <b>{f.name}</b>
                         <div className="small">{Math.max(1, Math.round(f.size / 1024))} KB</div>
                       </div>

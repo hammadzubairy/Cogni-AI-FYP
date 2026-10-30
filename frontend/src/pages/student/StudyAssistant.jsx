@@ -26,10 +26,15 @@ function AiChip({ children = 'Study assistant' }) {
 
 const SECTION_RE = /^(practice question|question|good answer|model answer|answer outline)\s*:?$/i
 
+function softBreakName(name) {
+  // Allow long underscore/dot filenames to wrap inside chat bubbles.
+  return String(name || '').replace(/([_.\-])/g, '$1\u200b')
+}
+
 function greetingMessage(doc) {
   return {
     r: 'a',
-    t: `Hi. Ask me anything about "${doc.name}". I answer only from this material and show the page I used.`,
+    t: `Hi. Ask me anything about "${softBreakName(doc.name)}". I answer only from this material and show the page I used.`,
     id: `greet-${doc.id}`,
   }
 }
