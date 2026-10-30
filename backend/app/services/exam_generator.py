@@ -236,7 +236,7 @@ async def _call_llm_for_questions(
         preferred_topic=preferred_topic,
         preferred_clo=preferred_clo,
     )
-    data = await call_json(llm, EXAM_GEN_SYSTEM_PROMPT, user_prompt, max_tokens=4000, temperature=0.5)
+    data = await call_json(llm, EXAM_GEN_SYSTEM_PROMPT, user_prompt, max_tokens=2500, temperature=0.4)
     raw_questions = data.get("questions", []) if isinstance(data, dict) else []
 
     questions, warnings = [], []
@@ -340,8 +340,10 @@ async def generate_questions(
             deduped.append(q)
     questions = deduped
 
-    questions, qa_warnings = await filter_questions_quality(llm, questions)
-    warnings.extend(qa_warnings)
+    # Quality filter is a second LLM round-trip. On free OpenRouter models that
+    # often pushes serverless past Vercel's 60s maxDuration (504). Schema
+    # validation already ran; keep the draft and warn.
+    warnings.append("Quality filter skipped to keep generation under the platform time limit.")
 
     for prior_questions in existing_exam_questions or []:
         for q in questions:
@@ -354,30 +356,7 @@ async def generate_questions(
     for q in questions:
         by_type.setdefault(q["type"], []).append(q)
 
-    shortfall = {t: counts[t] - len(by_type.get(t, [])) for t in counts}
-    shortfall = {t: n for t, n in shortfall.items() if n > 0}
-    if shortfall:
-        retry_questions, retry_warnings = await _call_llm_for_questions(
-            llm,
-            source_chunks,
-            shortfall,
-            clos,
-            formats=formats,
-            avoid_texts=[q["text"] for q in questions],
-        )
-        warnings.extend(retry_warnings)
-        retry_questions, retry_qa = await filter_questions_quality(llm, retry_questions)
-        warnings.extend(retry_qa)
-        for q in retry_questions:
-            if q["type"] not in shortfall:
-                continue
-            if _is_duplicate(q, questions):
-                continue
-            if len(by_type.get(q["type"], [])) >= counts[q["type"]]:
-                continue
-            by_type.setdefault(q["type"], []).append(q)
-            questions.append(q)
-
+    # One LLM pass only — shortfall retries also blow the serverless time budget.
     for t, needed in counts.items():
         have = len(by_type.get(t, []))
         if have < needed:

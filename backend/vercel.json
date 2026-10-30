@@ -3,7 +3,7 @@
   "framework": "fastapi",
   "functions": {
     "main.py": {
-      "maxDuration": 60,
+      "maxDuration": 300,
       "excludeFiles": "{tests/**,.venv/**,htmlcov/**,**/*.pyc,__pycache__/**,.pytest_cache/**,.ruff_cache/**,.env}"
     }
   }
