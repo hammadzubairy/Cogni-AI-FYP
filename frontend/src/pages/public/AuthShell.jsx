@@ -4,7 +4,7 @@ import Logo from '../../components/Logo'
 import { Icon } from '../../components/IconSprite'
 
 /** Shared layout for public auth pages (login, register, setup, etc.). */
-export default function AuthShell({ title, subtitle, children, sideTitle, sideBody }) {
+export default function AuthShell({ title, subtitle, children, sideTitle, sideBody, titleAction }) {
   return (
     <div id="v-login">
       <div className="auth">
@@ -32,6 +32,7 @@ export default function AuthShell({ title, subtitle, children, sideTitle, sideBo
             </span>
           </div>
           <div className="auth-card">
+            {titleAction ? <div className="auth-card-tools">{titleAction}</div> : null}
             <h1>{title}</h1>
             {subtitle ? (
               <p className="small" style={{ margin: '0 0 22px' }}>

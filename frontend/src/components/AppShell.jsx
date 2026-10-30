@@ -171,7 +171,9 @@ export default function AppShell({ children }) {
   const onSignOut = () => {
     if (document.body.classList.contains('exam-mode')) return
     logout()
-    navigate('/login', { replace: true })
+    // Hard redirect avoids a Soft-nav race where polls hit the API with no
+    // token and flash ShellError ("Could not validate credentials").
+    window.location.assign('/login')
   }
 
   const onNote = (n) => {

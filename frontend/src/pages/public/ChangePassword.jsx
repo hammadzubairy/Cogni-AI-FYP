@@ -42,12 +42,26 @@ export default function ChangePassword() {
 
   function onSignOut() {
     logout()
-    navigate('/login', { replace: true })
+    // Hard redirect — same clean slate as a refresh (avoids credentials flash).
+    window.location.assign('/login')
   }
+
+  const titleAction = (
+    <button
+      type="button"
+      className="btn ghost icon"
+      aria-label={showPw ? 'Hide passwords' : 'Show passwords'}
+      aria-pressed={showPw}
+      onClick={() => setShowPw((v) => !v)}
+    >
+      <Icon name={showPw ? 'eyeoff' : 'eye'} />
+    </button>
+  )
 
   return (
     <AuthShell
       title="Change your password"
+      titleAction={titleAction}
       subtitle={
         mustChangePassword
           ? 'Your account must use a new password before you can use the rest of Cogni.ai.'
@@ -62,24 +76,14 @@ export default function ChangePassword() {
       ) : null}
       <div className="field">
         <label htmlFor="cp-cur">Current password</label>
-        <div className="pw">
-          <input
-            id="cp-cur"
-            type={showPw ? 'text' : 'password'}
-            value={current}
-            onChange={(e) => setCurrent(e.target.value)}
-            disabled={busy}
-            autoComplete="current-password"
-          />
-          <button
-            type="button"
-            className="btn ghost"
-            aria-label={showPw ? 'Hide password' : 'Show password'}
-            onClick={() => setShowPw((v) => !v)}
-          >
-            <Icon name={showPw ? 'eyeoff' : 'eye'} />
-          </button>
-        </div>
+        <input
+          id="cp-cur"
+          type={showPw ? 'text' : 'password'}
+          value={current}
+          onChange={(e) => setCurrent(e.target.value)}
+          disabled={busy}
+          autoComplete="current-password"
+        />
       </div>
       <div className="field">
         <label htmlFor="cp-new">New password</label>

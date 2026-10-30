@@ -12,6 +12,8 @@
 .auth .body{padding-block:40px;padding-inline:clamp(16px,5vw,56px);display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr);gap:48px;align-content:start;animation:fadeUp .45s var(--ease-out) both}
 @media(max-width:1100px){.auth .body{grid-template-columns:1fr;max-width:640px}}
 .auth h1{font-size:28px;margin-bottom:6px}
+.auth-card-tools{display:flex;justify-content:flex-end;margin:0 0 4px}
+.auth-card-tools .btn.icon{min-height:38px;width:38px;padding:0}
 .field{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;min-width:0}
 .field label,.lbl{font-size:14px;font-weight:600;color:var(--color-foreground)}
 .field .hint{font-size:13px;color:var(--color-muted-foreground);margin-top:-2px}
@@ -24,6 +26,9 @@
 .pw{position:relative}
 .pw input{padding-right:48px}
 .pw .btn{position:absolute;right:3px;top:3px;min-height:38px;width:38px;padding:0}
+/* Hide browser native password reveal so it does not stack on our eye toggle. */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear{display:none}
 .err{display:flex;gap:8px;background:var(--color-destructive-muted);border:1px solid color-mix(in srgb,var(--color-destructive) 35%,transparent);color:var(--color-destructive);border-radius:var(--radius-sm);padding:10px 12px;font-size:14px;margin-bottom:16px;animation:shake .32s var(--ease-out)}
 .accts{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(270px,100%),1fr));gap:14px}
 .agroup{border:1px solid var(--color-border);border-radius:var(--radius);background:var(--color-card);overflow:hidden;box-shadow:var(--shadow-sm)}
