@@ -103,6 +103,11 @@ def validate_question(q: dict, formats: dict[str, str] | None = None) -> str | N
     """Return a human-readable error, or None if the question is valid."""
     if not isinstance(q, dict):
         return "question is not an object"
+    # Some models emit `stem` instead of `text`.
+    if not q.get("text") and isinstance(q.get("stem"), str) and q["stem"].strip():
+        q["text"] = q["stem"].strip()
+    if not q.get("clo"):
+        q["clo"] = "CLO-1"
     if not {"type", "bloom", "topic", "clo", "text"}.issubset(q):
         return "missing required fields"
     label = q.get("type")
@@ -283,6 +288,10 @@ async def filter_questions_quality(
             warnings.append(f'Quality filter dropped "{stem}": {reason}')
 
     kept = [q for i, q in enumerate(questions) if i not in rejected]
+    # Free-tier models often over-reject; never wipe a schema-valid batch.
+    if not kept and questions:
+        warnings.append("Quality filter rejected every question; kept schema-valid draft.")
+        return questions, warnings
     return kept, warnings
 
 

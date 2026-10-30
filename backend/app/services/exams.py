@@ -191,6 +191,27 @@ async def get_exam(user: CurrentUser, exam_id: str) -> dict:
     return await _assert_read_access(user, exam)
 
 
+async def get_exam_pdf(user: CurrentUser, exam_id: str) -> tuple[bytes, str]:
+    """Student-facing paper PDF for teacher (owner) or HOD (same dept) only."""
+    from app.services.exam_pdf import build_exam_pdf
+
+    exam = await _get_exam_or_404(exam_id)
+    cls = await _get_class_or_404(exam["class_id"])
+    if user.role == "teacher":
+        if exam["teacher_id"] != user.id:
+            raise HTTPException(status_code=403, detail="You do not own this exam.")
+    elif user.role == "hod":
+        if cls["dept_id"] != user.dept_id:
+            raise HTTPException(status_code=403, detail="This exam is outside your department.")
+    else:
+        raise HTTPException(status_code=403, detail="Only teachers and HODs can download exam PDFs.")
+
+    class_label = f"{cls.get('code') or ''} · {cls.get('name') or ''}".strip(" ·")
+    # Strip answers so the PDF is always the student paper.
+    paper = _strip_for_student(exam)
+    return build_exam_pdf(paper, class_label=class_label or None)
+
+
 async def generate_exam(actor: CurrentUser, payload) -> tuple[dict, list[str]]:
     counts = payload.counts_map()
     formats = payload.format_map()
@@ -238,11 +259,15 @@ async def generate_exam(actor: CurrentUser, payload) -> tuple[dict, list[str]]:
     ]
 
     llm = get_llm_client()
+    # Empty CLO lists make free models omit/blank `clo`, which fails validation.
+    clos = [c for c in (cls.get("clos") or []) if isinstance(c, str) and c.strip()]
+    if not clos:
+        clos = ["CLO-1"]
     questions, warnings = await generate_questions(
         llm,
         chunks,
         counts,
-        cls.get("clos", []),
+        clos,
         formats=formats,
         existing_exam_questions=existing_exam_questions,
     )

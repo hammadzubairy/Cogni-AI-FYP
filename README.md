@@ -77,6 +77,52 @@ cd frontend && npm run build
 cd frontend && CI=1 npm run test:e2e   # Playwright; needs Mongo + Chromium
 ```
 
+## OCR Studio (CPU-only)
+
+Local text extraction for PDFs, PPTX, DOCX, images, and public URLs. Uses **Tesseract**
+on the server (no GPU, no external OCR API). Open **`/ocr`** while signed in
+(any role), or use the **OCR Studio** nav item.
+
+### System: install Tesseract
+
+```bash
+# Arch Linux
+sudo pacman -S tesseract tesseract-data-eng
+
+# Windows: install UB Mannheim Tesseract, tick "Add to PATH"
+# (or set env TESSERACT_CMD to the full path of tesseract.exe)
+```
+
+### Python deps
+
+```bash
+cd backend
+# if using requirements.txt:
+pip install pytesseract Pillow beautifulsoup4 pymupdf
+# or reinstall from pyproject / requirements.txt (includes the above)
+```
+
+### Run
+
+```bash
+# Backend
+cd backend && uvicorn app.main:app --reload --port 8000
+
+# Frontend
+cd frontend && npm run dev
+```
+
+Then sign in and open http://localhost:5173/ocr
+
+API: `GET /api/ocr/health`, `POST /api/ocr/file`, `POST /api/ocr/url` (file/url require auth).
+
+### Known OCR limitations
+
+- JS-heavy websites that render text only after JavaScript will return little or nothing
+- Old `.ppt` and `.doc` are not supported — convert with LibreOffice first:
+  `soffice --headless --convert-to pptx file.ppt`
+- Complex tables and formulas will not match a heavy vision model; this is for everyday clean text
+
 ## Deploy checklist
 
 - `APP_ENV=production`, strong `JWT_SECRET`, real LLM credentials
@@ -110,7 +156,7 @@ Use **two Vercel projects** from the same GitHub repo (recommended).
 | `JWT_SECRET` | ≥32 random chars |
 | `LLM_PROVIDER` | `openai` |
 | `LLM_BASE_URL` | `https://openrouter.ai/api/v1` |
-| `LLM_MODEL` | `minimax/minimax-m3.1-flash:free` |
+| `LLM_MODEL` | `poolside/laguna-s-2.1:free` (OpenRouter free; prefer low-reasoning models for JSON exams) |
 | `LLM_OCR_MODEL` | `nvidia/nemotron-3.5-super-vl:free` |
 | `LLM_API_KEY` | your OpenRouter key |
 | `CORS_ORIGINS` | frontend URL (set after step C) |
