@@ -49,6 +49,27 @@ def _extract_json(text: str) -> dict:
     raise LLMJSONError("The AI response did not contain a valid JSON object.")
 
 
+def _is_transient_provider_error(exc: BaseException) -> bool:
+    """True for errors worth trying on another model: 429 rate limits and
+    transient provider failures (502/503/529). Auth (401/403) and size
+    (413) errors are not transient across models with the same key."""
+    raw = str(exc).lower()
+    return any(
+        token in raw
+        for token in (
+            "429",
+            "rate limit",
+            "rate_limit",
+            "temporarily rate-limited",
+            "502",
+            "503",
+            "529",
+            "provider returned error",
+            "service is busy",
+        )
+    )
+
+
 class LLMClient:
     async def json_complete(
         self, system: str, user: str, *, max_tokens: int = 2000, temperature: float = 0.4
@@ -88,10 +109,35 @@ class OpenAIClient(LLMClient):
         api_key: str | None = None,
         base_url: str | None = None,
         model: str | None = None,
+        fallback_models: list[str] | None = None,
     ) -> None:
         from openai import AsyncOpenAI
 
         self._model = (model if model is not None else settings.LLM_MODEL) or ""
+        self.primary_model = self._model
+        self.last_model_used = self._model
+        if fallback_models is None:
+            url_for_fallback = base_url if base_url is not None else settings.LLM_BASE_URL
+            if "openrouter.ai" in (url_for_fallback or ""):
+                provider_for_fallback = "openrouter"
+            elif "groq.com" in (url_for_fallback or ""):
+                provider_for_fallback = "groq"
+            else:
+                provider_for_fallback = ""
+            if provider_for_fallback:
+                from app.services.llm_catalog import fallback_models_for_provider
+
+                fallback_models = fallback_models_for_provider(
+                    provider_for_fallback, self._model
+                )
+            else:
+                fallback_models = []
+        seen: set[str] = set()
+        self._fallback_models: list[str] = []
+        for mid in fallback_models or []:
+            if mid and mid != self._model and mid not in seen:
+                seen.add(mid)
+                self._fallback_models.append(mid)
         key = api_key if api_key is not None else settings.LLM_API_KEY
         url = base_url if base_url is not None else settings.LLM_BASE_URL
         kwargs: dict = {"api_key": key}
@@ -112,9 +158,10 @@ class OpenAIClient(LLMClient):
         max_tokens: int,
         temperature: float,
         json_object: bool,
+        model: str | None = None,
     ):
         kwargs: dict = {
-            "model": self._model,
+            "model": model or self._model,
             "messages": messages,
             "max_tokens": max_tokens,
             "temperature": temperature,
@@ -129,6 +176,64 @@ class OpenAIClient(LLMClient):
     async def json_complete(
         self, system: str, user: str, *, max_tokens: int = 2000, temperature: float = 0.4
     ) -> dict:
+        """Try the chosen model, then fallbacks on transient provider errors.
+
+        A 429 on one free model no longer fails the whole draft: the next
+        catalog model is tried with the same key and prompt. The saved
+        model is never changed; `last_model_used` records what actually
+        answered, so callers can warn the teacher about the switch.
+        """
+        models_to_try = [self._model] + list(self._fallback_models)
+        last_error: Exception | None = None
+        for model_id in models_to_try:
+            try:
+                result = await self._json_complete_for_model(
+                    system, user, max_tokens=max_tokens, temperature=temperature, model=model_id
+                )
+            except LLMJSONError:
+                # Let call_json() retry once with the full chain, as before.
+                raise
+            except LLMRequestError as exc:
+                last_error = exc
+                if not _is_transient_provider_error(exc):
+                    raise
+                if model_id != models_to_try[-1]:
+                    log_event(
+                        logger,
+                        "llm_model_fallback",
+                        provider="openai",
+                        from_model=model_id,
+                        error=str(exc)[:300],
+                    )
+                    continue
+                raise LLMRequestError(
+                    "The AI service is busy on all available free models. "
+                    "Try again later, or switch to another model in Settings."
+                ) from exc
+            self.last_model_used = model_id
+            if model_id != self._model:
+                log_event(
+                    logger,
+                    "llm_model_fallback_used",
+                    provider="openai",
+                    from_model=self._model,
+                    to_model=model_id,
+                )
+            return result
+        raise LLMRequestError(
+            "The AI service is busy on all available free models. "
+            "Try again later, or switch to another model in Settings."
+        ) from last_error
+
+    async def _json_complete_for_model(
+        self,
+        system: str,
+        user: str,
+        *,
+        max_tokens: int,
+        temperature: float,
+        model: str,
+    ) -> dict:
         messages = [
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -136,7 +241,11 @@ class OpenAIClient(LLMClient):
         try:
             try:
                 response = await self._chat(
-                    messages, max_tokens=max_tokens, temperature=temperature, json_object=True
+                    messages,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    json_object=True,
+                    model=model,
                 )
             except Exception as first_exc:
                 # Some free OpenRouter models reject response_format=json_object.
@@ -153,6 +262,7 @@ class OpenAIClient(LLMClient):
                         max_tokens=max_tokens,
                         temperature=temperature,
                         json_object=False,
+                        model=model,
                     )
                 else:
                     log_event(logger, "llm_provider_error", provider="openai", error=str(first_exc)[:500])
@@ -168,13 +278,14 @@ class OpenAIClient(LLMClient):
         content = response.choices[0].message.content or ""
         # Free routers sometimes return empty completions; one plain retry helps.
         if not content.strip():
-            log_event(logger, "llm_empty_completion", provider="openai", model=self._model)
+            log_event(logger, "llm_empty_completion", provider="openai", model=model)
             try:
                 response = await self._chat(
                     messages,
                     max_tokens=max_tokens,
                     temperature=max(temperature, 0.2),
                     json_object=False,
+                    model=model,
                 )
                 content = response.choices[0].message.content or ""
             except Exception as exc:

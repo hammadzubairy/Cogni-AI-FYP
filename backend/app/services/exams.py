@@ -271,6 +271,13 @@ async def generate_exam(actor: CurrentUser, payload) -> tuple[dict, list[str]]:
         formats=formats,
         existing_exam_questions=existing_exam_questions,
     )
+    fallback_used = getattr(llm, "last_model_used", None)
+    primary_model = getattr(llm, "primary_model", None)
+    if fallback_used and primary_model and fallback_used != primary_model:
+        warnings.append(
+            f"Your chosen model was busy, so this draft was generated with "
+            f"{fallback_used} instead. Your saved model was not changed."
+        )
     if not questions:
         raise HTTPException(
             status_code=400,

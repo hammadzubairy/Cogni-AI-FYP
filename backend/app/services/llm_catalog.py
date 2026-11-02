@@ -44,6 +44,31 @@ def models_for_provider(provider: str) -> list[dict[str, str]]:
     return []
 
 
+def fallback_models_for_provider(provider: str, primary_model: str) -> list[str]:
+    """Ordered fallback models for a provider, excluding the primary.
+
+    OpenRouter first tries the free router (it picks an available free
+    model), then the Nemotron Ultra free model that was verified working
+    on 2026-11-03, then any remaining catalog model. Gemma models are
+    therefore not tried first after a Gemma 429, because both Gemma free
+    models share the same upstream pool.
+    """
+    primary = (primary_model or "").strip()
+    ordered: list[str] = []
+    if (provider or "").strip().lower() == "openrouter":
+        preferred = ["openrouter/free", "nvidia/nemotron-3-ultra-550b-a55b:free"]
+        ordered = preferred + [m["id"] for m in OPENROUTER_FREE_CHAT_MODELS]
+    elif (provider or "").strip().lower() == "groq":
+        ordered = [m["id"] for m in GROQ_FREE_CHAT_MODELS]
+    seen: set[str] = set()
+    out: list[str] = []
+    for mid in ordered:
+        if mid and mid != primary and mid not in seen:
+            seen.add(mid)
+            out.append(mid)
+    return out
+
+
 def is_allowed_model(provider: str, model: str) -> bool:
     p = (provider or "").strip().lower()
     mid = (model or "").strip()
