@@ -33,6 +33,7 @@ class Question(BaseModel):
     keywords: list[Keyword] = Field(default_factory=list)
     marks: float
     source_chunk_idx: int | None = None
+    source_material_id: str | None = None
 
     @model_validator(mode="after")
     def _default_format(self) -> Self:
@@ -64,8 +65,48 @@ class ExamOut(OutBase):
     hod_comment: str = ""
     request_id: str | None = None
     material_ids: list[str] = Field(default_factory=list)
+    blueprint: dict | None = None
     history: list[HistoryEntry] = Field(default_factory=list)
     created_at: datetime
+
+
+class BlueprintRange(BaseModel):
+    """Page/slide range that should contribute weight_pct of remaining questions."""
+
+    material_id: str
+    page_from: int = Field(ge=1)
+    page_to: int = Field(ge=1)
+    weight_pct: float = Field(gt=0, le=100)
+
+    @model_validator(mode="after")
+    def _order(self) -> Self:
+        if self.page_from > self.page_to:
+            raise ValueError("page_from must be ≤ page_to.")
+        return self
+
+
+class BlueprintPin(BaseModel):
+    """Force `count` questions of a type from a specific page/slide range."""
+
+    material_id: str
+    page_from: int = Field(ge=1)
+    page_to: int = Field(ge=1)
+    type_label: str = Field(min_length=1, max_length=40)
+    count: int = Field(ge=1, le=40)
+
+    @field_validator("type_label")
+    @classmethod
+    def _strip_type(cls, v: str) -> str:
+        label = (v or "").strip()
+        if not label:
+            raise ValueError("type_label must not be empty")
+        return label[:40]
+
+    @model_validator(mode="after")
+    def _order(self) -> Self:
+        if self.page_from > self.page_to:
+            raise ValueError("page_from must be ≤ page_to.")
+        return self
 
 
 class GenerateCounts(BaseModel):
@@ -114,6 +155,8 @@ class ExamGenerateRequest(BaseModel):
     marks_mode: Literal["suggested", "total"] = "suggested"
     marks_per_type: MarksPerType | None = None
     total_marks: float | None = Field(default=None, gt=0, le=1000)
+    weightage: list[BlueprintRange] | None = None
+    pins: list[BlueprintPin] | None = None
 
     @model_validator(mode="after")
     def _normalize_types(self) -> Self:
@@ -121,20 +164,56 @@ class ExamGenerateRequest(BaseModel):
             labels = [t.label for t in self.types]
             if len(labels) != len(set(labels)):
                 raise ValueError("Question type labels must be unique.")
-            return self
-        if self.counts is None:
+        elif self.counts is None:
             raise ValueError("Provide types or legacy counts.")
-        marks = self.marks_per_type or MarksPerType()
-        self.types = [
-            QuestionTypeSpec(label="MCQ", count=self.counts.MCQ, format="mcq", marks=marks.MCQ),
-            QuestionTypeSpec(
-                label="Short", count=self.counts.Short, format="written", marks=marks.Short
-            ),
-            QuestionTypeSpec(
-                label="Essay", count=self.counts.Essay, format="written", marks=marks.Essay
-            ),
-        ]
+        else:
+            marks = self.marks_per_type or MarksPerType()
+            self.types = [
+                QuestionTypeSpec(label="MCQ", count=self.counts.MCQ, format="mcq", marks=marks.MCQ),
+                QuestionTypeSpec(
+                    label="Short", count=self.counts.Short, format="written", marks=marks.Short
+                ),
+                QuestionTypeSpec(
+                    label="Essay", count=self.counts.Essay, format="written", marks=marks.Essay
+                ),
+            ]
+        self._validate_blueprint()
         return self
+
+    def _validate_blueprint(self) -> None:
+        assert self.types is not None
+        mat_ids = set(self.material_ids or [])
+        type_counts = {t.label: t.count for t in self.types}
+        labels = set(type_counts)
+
+        weightage = self.weightage or []
+        pins = self.pins or []
+        if not weightage and not pins:
+            return
+
+        for row in weightage:
+            if row.material_id not in mat_ids:
+                raise ValueError("Weightage material must be one of the selected materials.")
+        for pin in pins:
+            if pin.material_id not in mat_ids:
+                raise ValueError("Pin material must be one of the selected materials.")
+            if pin.type_label not in labels:
+                raise ValueError(f"Pin type {pin.type_label!r} is not in the question types list.")
+
+        if weightage:
+            total_w = sum(r.weight_pct for r in weightage)
+            if abs(total_w - 100.0) > 0.51:
+                raise ValueError("Weightage percentages must add up to 100.")
+
+        pinned: dict[str, int] = {}
+        for pin in pins:
+            pinned[pin.type_label] = pinned.get(pin.type_label, 0) + pin.count
+        for label, n in pinned.items():
+            if n > type_counts.get(label, 0):
+                raise ValueError(
+                    f"Pinned {label} questions ({n}) exceed the total count "
+                    f"({type_counts.get(label, 0)})."
+                )
 
     def counts_map(self) -> dict[str, int]:
         assert self.types is not None
@@ -147,6 +226,9 @@ class ExamGenerateRequest(BaseModel):
     def format_map(self) -> dict[str, QuestionFormat]:
         assert self.types is not None
         return {t.label: t.format for t in self.types}
+
+    def has_blueprint(self) -> bool:
+        return bool(self.weightage) or bool(self.pins)
 
 
 class ExamGenerateResponse(BaseModel):

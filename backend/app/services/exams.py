@@ -5,9 +5,11 @@ from fastapi import HTTPException
 from app.core.db import get_db, oid, to_out
 from app.core.deps import CurrentUser
 from app.services import settings as settings_service
+from app.services.exam_blueprint import tag_chunks_with_material
 from app.services.exam_generator import (
     MAX_TOTAL_QUESTIONS,
     generate_questions,
+    generate_questions_with_blueprint,
     is_mcq,
     plan_marks,
     regenerate_one,
@@ -241,9 +243,10 @@ async def generate_exam(actor: CurrentUser, payload) -> tuple[dict, list[str]]:
             raise HTTPException(status_code=400, detail="A material does not belong to this class.")
         materials.append(m)
 
-    chunks: list[dict] = []
+    tagged_materials = []
     for m in materials:
-        chunks.extend(m.get("chunks", []))
+        tagged_materials.append({**m, "id": str(m["_id"]), "_id": m["_id"]})
+    chunks = tag_chunks_with_material(tagged_materials)
     if not chunks:
         raise HTTPException(status_code=400, detail="The selected material has no usable content.")
 
@@ -263,14 +266,28 @@ async def generate_exam(actor: CurrentUser, payload) -> tuple[dict, list[str]]:
     clos = [c for c in (cls.get("clos") or []) if isinstance(c, str) and c.strip()]
     if not clos:
         clos = ["CLO-1"]
-    questions, warnings = await generate_questions(
-        llm,
-        chunks,
-        counts,
-        clos,
-        formats=formats,
-        existing_exam_questions=existing_exam_questions,
-    )
+
+    use_blueprint = bool(getattr(payload, "has_blueprint", lambda: False)())
+    if use_blueprint:
+        questions, warnings = await generate_questions_with_blueprint(
+            llm,
+            chunks,
+            counts,
+            clos,
+            formats=formats,
+            weightage=payload.weightage,
+            pins=payload.pins,
+            existing_exam_questions=existing_exam_questions,
+        )
+    else:
+        questions, warnings = await generate_questions(
+            llm,
+            chunks,
+            counts,
+            clos,
+            formats=formats,
+            existing_exam_questions=existing_exam_questions,
+        )
     fallback_used = getattr(llm, "last_model_used", None)
     primary_model = getattr(llm, "primary_model", None)
     if fallback_used and primary_model and fallback_used != primary_model:
@@ -298,6 +315,12 @@ async def generate_exam(actor: CurrentUser, payload) -> tuple[dict, list[str]]:
 
     material_names = ", ".join(m["name"] for m in materials)
     now = datetime.now(UTC)
+    blueprint = None
+    if use_blueprint:
+        blueprint = {
+            "weightage": [r.model_dump() for r in (payload.weightage or [])],
+            "pins": [p.model_dump() for p in (payload.pins or [])],
+        }
     doc = {
         "title": payload.title,
         "class_id": payload.class_id,
@@ -311,6 +334,7 @@ async def generate_exam(actor: CurrentUser, payload) -> tuple[dict, list[str]]:
         "hod_comment": "",
         "request_id": payload.request_id,
         "material_ids": payload.material_ids,
+        "blueprint": blueprint,
         "history": [{"at": now, "by": actor.id, "text": f"Draft generated from {material_names}"}],
         "created_at": now,
     }

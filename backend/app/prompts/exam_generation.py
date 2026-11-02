@@ -63,7 +63,13 @@ def build_exam_gen_user_prompt(
         "formats": type_formats,
         "clos": clos,
         "chunks": [
-            {"idx": c["idx"], "heading": c.get("heading"), "text": c["text"]} for c in chunks
+            {
+                "idx": c["idx"],
+                "page": c.get("page"),
+                "heading": c.get("heading"),
+                "text": c["text"],
+            }
+            for c in chunks
         ],
     }
     if avoid_texts:
