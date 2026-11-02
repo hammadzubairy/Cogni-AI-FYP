@@ -473,8 +473,15 @@ async def generate_questions_with_blueprint(
                 material_id=scope.material_id,
                 page_from=scope.page_from,
                 page_to=scope.page_to,
+                pages=scope.pages or None,
+                chunk_idxs=scope.chunk_idxs or None,
             )
-            page_label = f"pages {scope.page_from}–{scope.page_to}"
+            if scope.chunk_idxs and not scope.pages:
+                page_label = f"{len(scope.chunk_idxs)} selected section(s)"
+            elif scope.pages and len(scope.pages) <= 6:
+                page_label = "pages " + ", ".join(str(p) for p in scope.pages)
+            else:
+                page_label = f"pages {scope.page_from}–{scope.page_to}"
         else:
             scoped_chunks = chunks
             page_label = "all selected material"

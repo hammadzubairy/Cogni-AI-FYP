@@ -61,6 +61,10 @@ def test_tag_and_filter_chunks():
     assert len(mid) == 1 and mid[0]["text"] == "b"
     slide7 = chunks_for_pages(tagged, material_id="m1", page_from=7, page_to=7)
     assert len(slide7) == 1 and slide7[0]["text"] == "c"
+    by_pages = chunks_for_pages(tagged, material_id="m1", pages=[1, 7])
+    assert {c["text"] for c in by_pages} == {"a", "c"}
+    by_idx = chunks_for_pages(tagged, material_id="m1", chunk_idxs=[1])
+    assert len(by_idx) == 1 and by_idx[0]["text"] == "b"
 
 
 def test_allocation_pins_then_weightage():
@@ -144,6 +148,24 @@ def test_schema_rejects_bad_blueprint():
         ],
     )
     assert ok.has_blueprint()
+    named = ExamGenerateRequest(
+        **base,
+        weightage=[
+            {"material_id": "m1", "pages": [1, 2, 3, 4], "weight_pct": 30},
+            {"material_id": "m1", "pages": [5, 7, 10], "weight_pct": 70},
+        ],
+        pins=[
+            {
+                "material_id": "m1",
+                "pages": [7],
+                "type_label": "Long",
+                "count": 1,
+            }
+        ],
+    )
+    assert named.weightage[0].page_from == 1
+    assert named.weightage[0].page_to == 4
+    assert named.pins[0].pages == [7]
 
 
 @pytest.mark.asyncio

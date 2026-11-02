@@ -70,29 +70,55 @@ class ExamOut(OutBase):
     created_at: datetime
 
 
+def _normalize_blueprint_scope(model: "BlueprintRange | BlueprintPin") -> None:
+    """Accept named page lists and/or chunk indexes; keep from/to for legacy clients."""
+    pages = [int(p) for p in (model.pages or []) if int(p) >= 1]
+    idxs = [int(i) for i in (model.chunk_idxs or []) if int(i) >= 0]
+    model.pages = sorted(set(pages))
+    model.chunk_idxs = sorted(set(idxs))
+    if model.pages:
+        model.page_from = min(model.pages)
+        model.page_to = max(model.pages)
+    elif model.page_from is not None and model.page_to is not None:
+        if model.page_from > model.page_to:
+            raise ValueError("page_from must be ≤ page_to.")
+        if not model.pages:
+            model.pages = list(range(model.page_from, model.page_to + 1))
+    elif model.chunk_idxs:
+        model.page_from = model.page_from or 1
+        model.page_to = model.page_to or 1
+    else:
+        raise ValueError("Select at least one page/slide (or chunk) for each blueprint row.")
+
+
 class BlueprintRange(BaseModel):
-    """Page/slide range that should contribute weight_pct of remaining questions."""
+    """Selected pages/slides that should contribute weight_pct of remaining questions."""
 
     material_id: str
-    page_from: int = Field(ge=1)
-    page_to: int = Field(ge=1)
+    page_from: int | None = Field(default=None, ge=1)
+    page_to: int | None = Field(default=None, ge=1)
+    pages: list[int] = Field(default_factory=list)
+    chunk_idxs: list[int] = Field(default_factory=list)
     weight_pct: float = Field(gt=0, le=100)
+    label: str = ""
 
     @model_validator(mode="after")
-    def _order(self) -> Self:
-        if self.page_from > self.page_to:
-            raise ValueError("page_from must be ≤ page_to.")
+    def _normalize(self) -> Self:
+        _normalize_blueprint_scope(self)
         return self
 
 
 class BlueprintPin(BaseModel):
-    """Force `count` questions of a type from a specific page/slide range."""
+    """Force `count` questions of a type from selected pages/slides."""
 
     material_id: str
-    page_from: int = Field(ge=1)
-    page_to: int = Field(ge=1)
+    page_from: int | None = Field(default=None, ge=1)
+    page_to: int | None = Field(default=None, ge=1)
+    pages: list[int] = Field(default_factory=list)
+    chunk_idxs: list[int] = Field(default_factory=list)
     type_label: str = Field(min_length=1, max_length=40)
     count: int = Field(ge=1, le=40)
+    label: str = ""
 
     @field_validator("type_label")
     @classmethod
@@ -103,9 +129,8 @@ class BlueprintPin(BaseModel):
         return label[:40]
 
     @model_validator(mode="after")
-    def _order(self) -> Self:
-        if self.page_from > self.page_to:
-            raise ValueError("page_from must be ≤ page_to.")
+    def _normalize(self) -> Self:
+        _normalize_blueprint_scope(self)
         return self
 
 

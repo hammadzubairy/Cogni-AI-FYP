@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any
 
 
@@ -45,6 +45,14 @@ def pages_overlap(page: Any, page_from: int, page_to: int) -> bool:
     return not (hi < page_from or lo > page_to)
 
 
+def page_in_set(page: Any, pages: set[int]) -> bool:
+    span = parse_page_span(page)
+    if span is None or not pages:
+        return False
+    lo, hi = span
+    return any(p in pages for p in range(lo, hi + 1))
+
+
 def tag_chunks_with_material(materials: list[dict]) -> list[dict]:
     """Flatten material chunks and stamp material_id (and preserve idx)."""
     out: list[dict] = []
@@ -63,16 +71,27 @@ def chunks_for_pages(
     chunks: list[dict],
     *,
     material_id: str,
-    page_from: int,
-    page_to: int,
+    page_from: int | None = None,
+    page_to: int | None = None,
+    pages: list[int] | None = None,
+    chunk_idxs: list[int] | None = None,
 ) -> list[dict]:
     mid = str(material_id)
-    return [
-        c
-        for c in chunks
-        if str(c.get("material_id") or "") == mid
-        and pages_overlap(c.get("page"), page_from, page_to)
-    ]
+    page_set = {int(p) for p in (pages or []) if int(p) >= 1}
+    idx_set = {int(i) for i in (chunk_idxs or []) if int(i) >= 0}
+    if page_from is not None and page_to is not None and not page_set and not idx_set:
+        page_set = set(range(int(page_from), int(page_to) + 1))
+
+    selected: list[dict] = []
+    for c in chunks:
+        if str(c.get("material_id") or "") != mid:
+            continue
+        if idx_set and int(c.get("idx", -1)) in idx_set:
+            selected.append(c)
+            continue
+        if page_set and page_in_set(c.get("page"), page_set):
+            selected.append(c)
+    return selected
 
 
 def _largest_remainder_split(total: int, weights: list[float]) -> list[int]:
@@ -81,7 +100,6 @@ def _largest_remainder_split(total: int, weights: list[float]) -> list[int]:
         return [0] * len(weights)
     wsum = sum(max(0.0, w) for w in weights)
     if wsum <= 0:
-        # Even split fallback
         base = total // len(weights)
         rem = total % len(weights)
         return [base + (1 if i < rem else 0) for i in range(len(weights))]
@@ -94,6 +112,26 @@ def _largest_remainder_split(total: int, weights: list[float]) -> list[int]:
     return floors
 
 
+def _scope_pages(row: Any) -> tuple[int, int, list[int], list[int]]:
+    pages = list(getattr(row, "pages", None) or (row.get("pages") if isinstance(row, dict) else []) or [])
+    idxs = list(
+        getattr(row, "chunk_idxs", None)
+        or (row.get("chunk_idxs") if isinstance(row, dict) else [])
+        or []
+    )
+    pf = getattr(row, "page_from", None)
+    if pf is None and isinstance(row, dict):
+        pf = row.get("page_from")
+    pt = getattr(row, "page_to", None)
+    if pt is None and isinstance(row, dict):
+        pt = row.get("page_to")
+    if pages:
+        return min(pages), max(pages), [int(p) for p in pages], [int(i) for i in idxs]
+    if pf is not None and pt is not None:
+        return int(pf), int(pt), list(range(int(pf), int(pt) + 1)), [int(i) for i in idxs]
+    return 1, 1, [], [int(i) for i in idxs]
+
+
 @dataclass
 class GenScope:
     material_id: str
@@ -101,6 +139,8 @@ class GenScope:
     page_to: int
     counts: dict[str, int]
     kind: str  # "pin" | "weight"
+    pages: list[int] = field(default_factory=list)
+    chunk_idxs: list[int] = field(default_factory=list)
 
 
 def plan_generation_scopes(
@@ -117,8 +157,7 @@ def plan_generation_scopes(
         label = pin.type_label if hasattr(pin, "type_label") else pin["type_label"]
         count = int(pin.count if hasattr(pin, "count") else pin["count"])
         mid = pin.material_id if hasattr(pin, "material_id") else pin["material_id"]
-        pf = int(pin.page_from if hasattr(pin, "page_from") else pin["page_from"])
-        pt = int(pin.page_to if hasattr(pin, "page_to") else pin["page_to"])
+        pf, pt, pages, idxs = _scope_pages(pin)
         have = remaining.get(label, 0)
         take = min(count, have)
         if take <= 0:
@@ -131,6 +170,8 @@ def plan_generation_scopes(
                 page_to=pt,
                 counts={label: take},
                 kind="pin",
+                pages=pages,
+                chunk_idxs=idxs,
             )
         )
 
@@ -140,14 +181,11 @@ def plan_generation_scopes(
         return scopes
 
     if not weight_rows:
-        # No weightage: one synthetic “all remaining” scope is handled by caller
-        # using full chunk pool — signal via empty weight scopes.
         return scopes
 
     weights = [
         float(r.weight_pct if hasattr(r, "weight_pct") else r["weight_pct"]) for r in weight_rows
     ]
-    # Allocate each type separately so proportions stay fair.
     per_row: list[dict[str, int]] = [{} for _ in weight_rows]
     for label, need in remaining.items():
         if need <= 0:
@@ -162,8 +200,7 @@ def plan_generation_scopes(
         if not counts:
             continue
         mid = row.material_id if hasattr(row, "material_id") else row["material_id"]
-        pf = int(row.page_from if hasattr(row, "page_from") else row["page_from"])
-        pt = int(row.page_to if hasattr(row, "page_to") else row["page_to"])
+        pf, pt, pages, idxs = _scope_pages(row)
         scopes.append(
             GenScope(
                 material_id=str(mid),
@@ -171,6 +208,8 @@ def plan_generation_scopes(
                 page_to=pt,
                 counts=counts,
                 kind="weight",
+                pages=pages,
+                chunk_idxs=idxs,
             )
         )
     return scopes
