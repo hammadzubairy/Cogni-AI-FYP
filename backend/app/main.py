@@ -14,7 +14,9 @@ from app.routers import (
     dashboard,
     exams,
     materials,
+    me,
     notifications,
+    ocr,
     public,
     requests,
     setup,
@@ -41,6 +43,7 @@ register_exception_handlers(app)
 app.include_router(public.router)
 app.include_router(setup.router)
 app.include_router(auth.router)
+app.include_router(me.router)
 app.include_router(admin.router)
 app.include_router(classes.router)
 app.include_router(materials.router)
@@ -49,6 +52,7 @@ app.include_router(attempts.router)
 app.include_router(requests.router)
 app.include_router(notifications.router)
 app.include_router(dashboard.router)
+app.include_router(ocr.router)
 
 
 @app.get("/api/health")

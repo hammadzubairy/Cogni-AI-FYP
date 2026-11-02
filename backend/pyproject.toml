@@ -18,7 +18,11 @@ dependencies = [
   "httpx",
   "openai",
   "anthropic",
+  "cryptography",
   "python-dotenv",
+  "pytesseract",
+  "Pillow",
+  "beautifulsoup4",
 ]
 
 [tool.vercel]

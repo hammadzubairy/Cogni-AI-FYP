@@ -10,6 +10,7 @@ import ExamEditor from './ExamEditor'
 import Results from './Results'
 import AttemptReview from './AttemptReview'
 import Flags from './Flags'
+import Settings from './Settings'
 import NotFound from '../NotFound'
 
 /** Teacher portal routes inside AppShell (ARCHITECTURE F4 + F8). */
@@ -27,6 +28,7 @@ export default function TeacherApp() {
         <Route path="exams/:id/results" element={<Results />} />
         <Route path="attempts/:id" element={<AttemptReview />} />
         <Route path="flags" element={<Flags />} />
+        <Route path="settings" element={<Settings />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppShell>

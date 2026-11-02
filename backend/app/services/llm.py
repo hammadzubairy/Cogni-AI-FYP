@@ -82,44 +82,103 @@ def _friendly_llm_error(exc: BaseException) -> str:
 
 
 class OpenAIClient(LLMClient):
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        model: str | None = None,
+    ) -> None:
         from openai import AsyncOpenAI
 
-        kwargs: dict = {"api_key": settings.LLM_API_KEY}
-        if settings.LLM_BASE_URL:
-            kwargs["base_url"] = settings.LLM_BASE_URL
+        self._model = (model if model is not None else settings.LLM_MODEL) or ""
+        key = api_key if api_key is not None else settings.LLM_API_KEY
+        url = base_url if base_url is not None else settings.LLM_BASE_URL
+        kwargs: dict = {"api_key": key}
+        if url:
+            kwargs["base_url"] = url
         # OpenRouter ranks apps that send these optional headers.
-        if "openrouter.ai" in (settings.LLM_BASE_URL or ""):
+        if "openrouter.ai" in (url or ""):
             kwargs["default_headers"] = {
                 "HTTP-Referer": settings.PUBLIC_BASE_URL or "https://cogni.ai",
                 "X-Title": "Cogni.ai",
             }
         self._client = AsyncOpenAI(**kwargs)
 
+    async def _chat(
+        self,
+        messages: list[dict],
+        *,
+        max_tokens: int,
+        temperature: float,
+        json_object: bool,
+    ):
+        kwargs: dict = {
+            "model": self._model,
+            "messages": messages,
+            "max_tokens": max_tokens,
+            "temperature": temperature,
+        }
+        if json_object:
+            kwargs["response_format"] = {"type": "json_object"}
+        return await asyncio.wait_for(
+            self._client.chat.completions.create(**kwargs),
+            timeout=120,
+        )
+
     async def json_complete(
         self, system: str, user: str, *, max_tokens: int = 2000, temperature: float = 0.4
     ) -> dict:
+        messages = [
+            {"role": "system", "content": system},
+            {"role": "user", "content": user},
+        ]
         try:
-            response = await asyncio.wait_for(
-                self._client.chat.completions.create(
-                    model=settings.LLM_MODEL,
-                    messages=[
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    response_format={"type": "json_object"},
-                ),
-                timeout=120,
-            )
+            try:
+                response = await self._chat(
+                    messages, max_tokens=max_tokens, temperature=temperature, json_object=True
+                )
+            except Exception as first_exc:
+                # Some free OpenRouter models reject response_format=json_object.
+                detail = _friendly_llm_error(first_exc)
+                if "response_format" in str(first_exc).lower() or "json_object" in str(first_exc).lower():
+                    log_event(
+                        logger,
+                        "llm_json_mode_fallback",
+                        provider="openai",
+                        error=str(first_exc)[:300],
+                    )
+                    response = await self._chat(
+                        messages,
+                        max_tokens=max_tokens,
+                        temperature=temperature,
+                        json_object=False,
+                    )
+                else:
+                    log_event(logger, "llm_provider_error", provider="openai", error=str(first_exc)[:500])
+                    raise LLMRequestError(detail) from first_exc
         except TimeoutError as exc:
             raise LLMRequestError("The AI took too long to respond. Press Retry.") from exc
+        except LLMError:
+            raise
         except Exception as exc:
             detail = _friendly_llm_error(exc)
             log_event(logger, "llm_provider_error", provider="openai", error=str(exc)[:500])
             raise LLMRequestError(detail) from exc
         content = response.choices[0].message.content or ""
+        # Free routers sometimes return empty completions; one plain retry helps.
+        if not content.strip():
+            log_event(logger, "llm_empty_completion", provider="openai", model=self._model)
+            try:
+                response = await self._chat(
+                    messages,
+                    max_tokens=max_tokens,
+                    temperature=max(temperature, 0.2),
+                    json_object=False,
+                )
+                content = response.choices[0].message.content or ""
+            except Exception as exc:
+                raise LLMJSONError("The AI returned an empty response.") from exc
         usage = getattr(response, "usage", None)
         if usage is not None:
             log_event(
@@ -493,3 +552,25 @@ def get_llm_client() -> LLMClient:
     if provider == "anthropic":
         return AnthropicClient()
     raise NotImplementedError(f"LLM_PROVIDER={settings.LLM_PROVIDER!r} is not implemented.")
+
+
+def get_llm_client_for_user(user_doc: dict | None) -> LLMClient:
+    """Prefer teacher BYOK credentials; otherwise platform env client."""
+    from app.services.llm_settings import resolve_teacher_llm_credentials
+
+    creds = resolve_teacher_llm_credentials(user_doc)
+    if creds:
+        return OpenAIClient(
+            api_key=creds["api_key"],
+            base_url=creds["base_url"],
+            model=creds["model"],
+        )
+    return get_llm_client()
+
+
+async def get_llm_client_for_actor(actor) -> LLMClient:
+    """Load the actor's user doc and return a BYOK-aware LLM client."""
+    from app.core.db import get_db, oid
+
+    doc = await get_db().users.find_one({"_id": oid(actor.id)})
+    return get_llm_client_for_user(doc)

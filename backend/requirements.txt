@@ -13,7 +13,11 @@ python-multipart
 httpx
 openai
 anthropic
+cryptography
 python-dotenv
+pytesseract
+Pillow
+beautifulsoup4
 trafilatura>=2.3
 spacy
 sentence-transformers

@@ -15,6 +15,7 @@ export const ROLE = {
       { page: 'a-depts', to: '/app/admin/departments', label: 'Departments' },
       { page: 'a-users', to: '/app/admin/users', label: 'Users' },
       { page: 'a-settings', to: '/app/admin/settings', label: 'Settings' },
+      { page: 'x-ocr', to: '/ocr', label: 'OCR Studio' },
     ],
   },
   hod: {
@@ -28,6 +29,7 @@ export const ROLE = {
       { page: 'h-assign', to: '/app/hod/requests', label: 'Requests' },
       { page: 'h-approvals', to: '/app/hod/approvals', label: 'Approvals', badge: 'approvals' },
       { page: 'h-analytics', to: '/app/hod/analytics', label: 'Department' },
+      { page: 'x-ocr', to: '/ocr', label: 'OCR Studio' },
     ],
   },
   teacher: {
@@ -39,6 +41,8 @@ export const ROLE = {
     nav: [
       { page: 't-dash', to: '/app/teacher', label: 'Home' },
       { page: 't-flags', to: '/app/teacher/flags', label: 'Review', badge: 'review' },
+      { page: 't-settings', to: '/app/teacher/settings', label: 'Settings' },
+      { page: 'x-ocr', to: '/ocr', label: 'OCR Studio' },
     ],
   },
   student: {
@@ -50,6 +54,7 @@ export const ROLE = {
     nav: [
       { page: 's-dash', to: '/app/student', label: 'Home', badge: 'live' },
       { page: 's-study', to: '/app/student/study', label: 'Study assistant' },
+      { page: 'x-ocr', to: '/ocr', label: 'OCR Studio' },
     ],
   },
 }
@@ -107,6 +112,7 @@ export function pageToPath(page, id) {
     't-results': id ? `/app/teacher/exams/${id}/results` : '/app/teacher/exams',
     't-attempt': id ? `/app/teacher/attempts/${id}` : '/app/teacher',
     't-flags': '/app/teacher/flags',
+    't-settings': '/app/teacher/settings',
     's-dash': '/app/student',
     's-classes': '/app/student/classes',
     's-class': id ? `/app/student/classes/${id}` : '/app/student/classes',
@@ -116,6 +122,7 @@ export function pageToPath(page, id) {
     's-results': '/app/student/results',
     's-feedback': id ? `/app/student/attempts/${id}/feedback` : '/app/student/results',
     's-study': '/app/student/study',
+    'x-ocr': '/ocr',
   }
   return map[page] || null
 }
@@ -150,6 +157,7 @@ export function pathToPage(pathname, search = '') {
     [/^\/app\/hod\/policy$/, 'h-policy'],
     [/^\/app\/hod$/, 'h-dash'],
     [/^\/app\/teacher\/flags$/, 't-flags'],
+    [/^\/app\/teacher\/settings$/, 't-settings'],
     [/^\/app\/teacher\/attempts\/[^/]+$/, 't-attempt'],
     [/^\/app\/teacher\/exams\/[^/]+\/results$/, 't-results'],
     [/^\/app\/teacher\/exams\/new$/, 't-create'],
@@ -168,6 +176,7 @@ export function pathToPage(pathname, search = '') {
     [/^\/app\/student\/classes\/[^/]+$/, 's-class'],
     [/^\/app\/student\/classes$/, 's-classes'],
     [/^\/app\/student$/, 's-dash'],
+    [/^\/ocr$/, 'x-ocr'],
   ]
   for (const [re, page] of rules) {
     if (re.test(p)) return page

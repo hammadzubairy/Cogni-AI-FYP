@@ -63,6 +63,7 @@ export default function CreateExam() {
   const [fieldErrors, setFieldErrors] = useState({})
   const [warnings, setWarnings] = useState([])
   const [llmFailed, setLlmFailed] = useState(null)
+  const [llmNote, setLlmNote] = useState('')
   const [pipePromise, setPipePromise] = useState(null)
   const [busy, setBusy] = useState(false)
   const [titleTouched, setTitleTouched] = useState(false)
@@ -71,9 +72,22 @@ export default function CreateExam() {
     setLoading(true)
     setError(null)
     try {
-      const [cls, reqs] = await Promise.all([api.listClasses(), api.listRequests().catch(() => [])])
+      const [cls, reqs, llm] = await Promise.all([
+        api.listClasses(),
+        api.listRequests().catch(() => []),
+        api.getMyLlmSettings().catch(() => null),
+      ])
       setClasses(cls)
       setRequests(reqs || [])
+      if (llm?.using_platform) {
+        setLlmNote('Using the platform LLM. You can add your own OpenRouter or Groq key in Settings.')
+      } else if (llm?.provider) {
+        setLlmNote(
+          `Using your ${llm.provider} key${llm.model ? ` · ${llm.model}` : ''}. Change this in Settings.`,
+        )
+      } else {
+        setLlmNote('')
+      }
 
       let initialClass = prefillClass
       let initialKind = 'Quiz'
@@ -306,6 +320,13 @@ export default function CreateExam() {
         title="Generate a draft paper"
       />
       <Stepper step={1} />
+
+      {llmNote ? (
+        <p className="small" style={{ margin: '0 0 12px', color: 'var(--color-muted-foreground)' }}>
+          {llmNote}{' '}
+          <Link to="/app/teacher/settings">Open Settings</Link>
+        </p>
+      ) : null}
 
       {!materials.length ? (
         <div className="callout red">

@@ -14,7 +14,7 @@ from app.services.exam_generator import (
     resolve_format,
 )
 from app.services.grading import finalize_attempt
-from app.services.llm import get_llm_client
+from app.services.llm import get_llm_client_for_actor
 from app.services.notify import log_activity, notify
 
 EDITABLE_STATUSES = {"draft", "returned"}
@@ -258,7 +258,7 @@ async def generate_exam(actor: CurrentUser, payload) -> tuple[dict, list[str]]:
         e["questions"] async for e in db.exams.find({"class_id": payload.class_id}, {"questions": 1})
     ]
 
-    llm = get_llm_client()
+    llm = await get_llm_client_for_actor(actor)
     # Empty CLO lists make free models omit/blank `clo`, which fails validation.
     clos = [c for c in (cls.get("clos") or []) if isinstance(c, str) and c.strip()]
     if not clos:
@@ -396,7 +396,7 @@ async def regenerate_question(actor: CurrentUser, exam_id: str, qid: str) -> dic
 
     try:
         new_q = await regenerate_one(
-            get_llm_client(),
+            await get_llm_client_for_actor(actor),
             chunks,
             questions,
             old["type"],
@@ -436,7 +436,7 @@ async def add_question(
 
     try:
         new_q = await regenerate_one(
-            get_llm_client(),
+            await get_llm_client_for_actor(actor),
             chunks,
             exam["questions"],
             qtype,

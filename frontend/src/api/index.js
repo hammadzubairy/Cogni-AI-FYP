@@ -48,6 +48,15 @@ export function switchRole(role) {
   return post('/auth/switch-role', { role })
 }
 
+/* ---------- teacher LLM settings (BYOK) ---------- */
+export function getMyLlmSettings() {
+  return get('/me/llm')
+}
+
+export function putMyLlmSettings(body) {
+  return put('/me/llm', body)
+}
+
 export function getMe() {
   return get('/auth/me')
 }
