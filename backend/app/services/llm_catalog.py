@@ -13,13 +13,15 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 # Chat / instruct free models that can return exam JSON.
-# Prefer models that reliably return exam JSON. Nemotron Lightning often
-# replies empty / non-JSON on free tier and fails generation twice.
+# Laguna S was removed from OpenRouter; Nemotron Lightning often returns empty.
 OPENROUTER_FREE_CHAT_MODELS: list[dict[str, str]] = [
     {"id": "openrouter/free", "label": "Free Models Router"},
+    {
+        "id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+        "label": "NVIDIA Nemotron 3 Ultra 550B (free)",
+    },
     {"id": "google/gemma-4-26b-a4b-it:free", "label": "Google Gemma 4 26B A4B (free)"},
     {"id": "google/gemma-4-31b-it:free", "label": "Google Gemma 4 31B (free)"},
-    {"id": "poolside/laguna-s-2.1:free", "label": "Poolside Laguna S 2.1 (free)"},
 ]
 
 GROQ_FREE_CHAT_MODELS: list[dict[str, str]] = [

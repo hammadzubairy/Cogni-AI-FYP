@@ -102,14 +102,14 @@ def test_teacher_put_masks_key_and_never_returns_plaintext(client):
         headers=headers,
         json={
             "provider": "openrouter",
-            "model": "poolside/laguna-s-2.1:free",
+            "model": "nvidia/nemotron-3-ultra-550b-a55b:free",
             "api_key": key,
         },
     )
     assert resp.status_code == 200, resp.text
     body = resp.json()
     assert body["provider"] == "openrouter"
-    assert body["model"] == "poolside/laguna-s-2.1:free"
+    assert body["model"] == "nvidia/nemotron-3-ultra-550b-a55b:free"
     assert body["api_key_set"] is True
     assert body["using_platform"] is False
     assert body["api_key_masked"] == "••••9999"
