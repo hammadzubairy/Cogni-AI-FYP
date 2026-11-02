@@ -194,6 +194,7 @@ def finalize_question(raw: dict, formats: dict[str, str] | None = None) -> dict:
     q["format"] = fmt
     q["marks"] = default_marks_for(q["type"], fmt)
     q.setdefault("source_chunk_idx", None)
+    q.setdefault("source_material_id", None)
     if fmt == "mcq":
         q.setdefault("model_answer", "")
         q.setdefault("keywords", [])
@@ -216,6 +217,12 @@ def _bloom_mix_warning(questions: list[dict]) -> str | None:
     return None
 
 
+def _max_tokens_for_counts(counts: dict[str, int]) -> int:
+    """Larger Midterm/Final batches need more completion budget or JSON truncates."""
+    n = sum(max(0, int(v)) for v in counts.values())
+    return min(4500, max(1800, 700 + 400 * n))
+
+
 async def _call_llm_for_questions(
     llm: LLMClient,
     chunks: list[dict],
@@ -236,7 +243,13 @@ async def _call_llm_for_questions(
         preferred_topic=preferred_topic,
         preferred_clo=preferred_clo,
     )
-    data = await call_json(llm, EXAM_GEN_SYSTEM_PROMPT, user_prompt, max_tokens=2500, temperature=0.4)
+    data = await call_json(
+        llm,
+        EXAM_GEN_SYSTEM_PROMPT,
+        user_prompt,
+        max_tokens=_max_tokens_for_counts(counts),
+        temperature=0.4,
+    )
     raw_questions = data.get("questions", []) if isinstance(data, dict) else []
 
     questions, warnings = [], []
@@ -247,6 +260,13 @@ async def _call_llm_for_questions(
             continue
         questions.append(finalize_question(raw, formats))
     return questions, warnings
+
+
+def _should_batch_by_type(counts: dict[str, int]) -> bool:
+    """Midterm/Final-sized papers: one big JSON blob often truncates on free models."""
+    total = sum(max(0, int(v)) for v in counts.values())
+    types_with_q = sum(1 for v in counts.values() if int(v) > 0)
+    return total >= 8 or (types_with_q >= 2 and total >= 7)
 
 
 async def filter_questions_quality(
@@ -330,9 +350,40 @@ async def generate_questions(
         raise ValueError(f"Cannot request more than {MAX_TOTAL_QUESTIONS} questions.")
 
     source_chunks = select_source_chunks(chunks)
-    questions, warnings = await _call_llm_for_questions(
-        llm, source_chunks, counts, clos, formats=formats
-    )
+    warnings: list[str] = []
+    questions: list[dict] = []
+
+    # Batch by type for Midterm/Final-sized mixes — free models truncate big JSON.
+    if _should_batch_by_type(counts):
+        for label, need in counts.items():
+            if need <= 0:
+                continue
+            try:
+                batch, warns = await _call_llm_for_questions(
+                    llm,
+                    source_chunks,
+                    {label: need},
+                    clos,
+                    formats=formats,
+                )
+                warnings.extend(warns)
+                for q in batch:
+                    if not _is_duplicate(q, questions):
+                        questions.append(q)
+            except LLMError as exc:
+                warnings.append(
+                    f"Could not generate {need} {label} question(s): {exc}. "
+                    "Try again or use a different model in Settings."
+                )
+        if not questions:
+            # Re-raise a single failure if every type failed.
+            raise LLMError(
+                "This model could not generate the paper. Please retry with another model, or try again."
+            )
+    else:
+        questions, warnings = await _call_llm_for_questions(
+            llm, source_chunks, counts, clos, formats=formats
+        )
 
     deduped: list[dict] = []
     for q in questions:
@@ -356,7 +407,6 @@ async def generate_questions(
     for q in questions:
         by_type.setdefault(q["type"], []).append(q)
 
-    # One LLM pass only — shortfall retries also blow the serverless time budget.
     for t, needed in counts.items():
         have = len(by_type.get(t, []))
         if have < needed:
@@ -365,6 +415,116 @@ async def generate_questions(
     final: list[dict] = []
     for t in counts:
         final.extend(by_type.get(t, [])[: counts[t]])
+
+    mix_warning = _bloom_mix_warning(final)
+    if mix_warning:
+        warnings.append(mix_warning)
+
+    return final, warnings
+
+
+async def generate_questions_with_blueprint(
+    llm: LLMClient,
+    chunks: list[dict],
+    counts: dict[str, int],
+    clos: list[str],
+    *,
+    formats: dict[str, str] | None = None,
+    weightage: list | None = None,
+    pins: list | None = None,
+    existing_exam_questions: list[list[dict]] | None = None,
+) -> tuple[list[dict], list[str]]:
+    """Multi-pass generation: pins first, then weightage-split remainder."""
+    from app.services.exam_blueprint import (
+        GenScope,
+        chunks_for_pages,
+        plan_generation_scopes,
+        remaining_counts_after_pins,
+    )
+
+    total_requested = sum(counts.values())
+    if total_requested > MAX_TOTAL_QUESTIONS:
+        raise ValueError(f"Cannot request more than {MAX_TOTAL_QUESTIONS} questions.")
+
+    scopes = plan_generation_scopes(counts, weightage=weightage, pins=pins)
+    rem = remaining_counts_after_pins(counts, pins)
+    # Pins without weightage: leftover from the full chunk pool.
+    if rem and not (weightage or []):
+        scopes.append(
+            GenScope(
+                material_id="",
+                page_from=1,
+                page_to=10**9,
+                counts=rem,
+                kind="weight",
+            )
+        )
+
+    all_questions: list[dict] = []
+    warnings: list[str] = []
+
+    for scope in scopes:
+        need = {k: v for k, v in scope.counts.items() if v > 0}
+        if not need:
+            continue
+        if scope.material_id:
+            scoped_chunks = chunks_for_pages(
+                chunks,
+                material_id=scope.material_id,
+                page_from=scope.page_from,
+                page_to=scope.page_to,
+            )
+            page_label = f"pages {scope.page_from}–{scope.page_to}"
+        else:
+            scoped_chunks = chunks
+            page_label = "all selected material"
+        if not scoped_chunks:
+            warnings.append(
+                f"No material on {page_label} for {sum(need.values())} question(s); skipped."
+            )
+            continue
+        source = select_source_chunks(scoped_chunks)
+        try:
+            qs, warns = await _call_llm_for_questions(
+                llm, source, need, clos, formats=formats
+            )
+        except LLMError as exc:
+            warnings.append(
+                f"Skipped {page_label} ({sum(need.values())} question(s)): {exc}"
+            )
+            continue
+        warnings.extend(warns)
+        for q in qs:
+            if scope.material_id:
+                q["source_material_id"] = scope.material_id
+            if not _is_duplicate(q, all_questions):
+                all_questions.append(q)
+
+        by_type: dict[str, list[dict]] = {t: [] for t in need}
+        for q in qs:
+            by_type.setdefault(q["type"], []).append(q)
+        for t, needed_n in need.items():
+            have = len(by_type.get(t, []))
+            if have < needed_n:
+                warnings.append(
+                    f"Only generated {have}/{needed_n} {t} question(s) from {page_label}."
+                )
+
+    by_type_all: dict[str, list[dict]] = {t: [] for t in counts}
+    for q in all_questions:
+        by_type_all.setdefault(q["type"], []).append(q)
+    final: list[dict] = []
+    for t, needed_n in counts.items():
+        final.extend(by_type_all.get(t, [])[:needed_n])
+
+    warnings.append("Quality filter skipped to keep generation under the platform time limit.")
+
+    for prior_questions in existing_exam_questions or []:
+        for q in final:
+            if _is_duplicate(q, prior_questions):
+                warnings.append(
+                    f'Repeated question (similar to an earlier exam): "{q["text"][:60]}".'
+                )
 
     mix_warning = _bloom_mix_warning(final)
     if mix_warning:
