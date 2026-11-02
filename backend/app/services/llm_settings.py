@@ -43,10 +43,12 @@ def settings_out_from_doc(doc: dict | None) -> TeacherLlmSettingsOut:
         except ValueError:
             masked = "••••"
             api_key_set = True
-    using_platform = provider == "platform" or not api_key_set
+    model_ok = provider == "platform" or llm_catalog.is_allowed_model(provider, model)
+    # Delisted / broken free models fall back to the platform client at generate time.
+    using_platform = provider == "platform" or not api_key_set or not model_ok
     return TeacherLlmSettingsOut(
         provider=provider,  # type: ignore[arg-type]
-        model=model,
+        model=model if model_ok else "",
         api_key_set=api_key_set,
         api_key_masked=masked,
         using_platform=using_platform,

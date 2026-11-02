@@ -524,7 +524,9 @@ async def call_json(
                 provider=provider,
                 latency_ms=round((time.monotonic() - start) * 1000, 1),
             )
-            raise LLMError("The AI service returned invalid JSON twice in a row.") from exc
+            raise LLMError(
+                "This model could not generate the paper. Please retry with another model, or try again."
+            ) from exc
     except LLMError:
         log_event(
             logger,

@@ -268,7 +268,7 @@ export default function CreateExam() {
     const raw = err instanceof ApiError ? err.message : 'Generation failed.'
     const code = err instanceof ApiError ? err.code : ''
     const status = err instanceof ApiError ? err.status : 0
-    // Only rewrite known size / rate-limit failures — keep other API details honest.
+    // Friendly copy for known LLM / size failures — hide provider jargon.
     let msg = raw
     const lower = String(raw).toLowerCase()
     const isSizeOrBusy =
@@ -281,9 +281,17 @@ export default function CreateExam() {
       lower.includes('rate_limit')
     const isProviderNoise =
       lower.includes("{'error'") || lower.includes('{"error"')
+    const isModelFail =
+      code === 'LLM_FAILED' ||
+      lower.includes('invalid json') ||
+      lower.includes('empty response') ||
+      lower.includes('could not generate') ||
+      lower.includes('could not finish')
     if (isSizeOrBusy || isProviderNoise) {
       msg =
         'The AI could not finish this draft — the material may be too large for one pass, or the service was busy. Try fewer source files or a shorter document, then press Retry.'
+    } else if (isModelFail) {
+      msg = "This model could not generate the paper. Please retry with another model, or try again."
     } else if (msg.length > 220) {
       msg = `${msg.slice(0, 200).trim()}…`
     }
