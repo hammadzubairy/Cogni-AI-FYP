@@ -10,14 +10,17 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Anton&family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet" />
     <script>
-      /* apply saved or system theme before first paint (no flash) */
+      /* apply saved mode + palette before first paint (no flash) */
       try {
         var t = localStorage.getItem('cogni-theme')
         if (t !== 'light' && t !== 'dark')
           t = matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
         document.documentElement.dataset.theme = t
+        var p = localStorage.getItem('cogni-palette') || 'clay'
+        document.documentElement.dataset.palette = p
       } catch (e) {
         document.documentElement.dataset.theme = 'light'
+        document.documentElement.dataset.palette = 'clay'
       }
     </script>
   </head>

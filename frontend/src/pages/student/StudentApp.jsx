@@ -10,6 +10,7 @@ import ExamDone from './ExamDone'
 import Results from './Results'
 import Feedback from './Feedback'
 import StudyAssistant from './StudyAssistant'
+import AppearanceSettings from '../shared/AppearanceSettings'
 
 /** Student portal routes inside AppShell (ARCHITECTURE F7). */
 export default function StudentApp() {
@@ -25,6 +26,7 @@ export default function StudentApp() {
         <Route path="results" element={<Results />} />
         <Route path="attempts/:id/feedback" element={<Feedback />} />
         <Route path="study" element={<StudyAssistant />} />
+        <Route path="settings" element={<AppearanceSettings />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppShell>

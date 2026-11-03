@@ -6,13 +6,20 @@ import {
   useMemo,
   useState,
 } from 'react'
+import {
+  DEFAULT_PALETTE,
+  THEME_MODE_KEY,
+  THEME_PALETTE_KEY,
+  THEME_PALETTES,
+  isValidPalette,
+  paletteById,
+} from '../utils/themes'
 
-const KEY = 'cogni-theme'
 const ThemeContext = createContext(null)
 
-function readTheme() {
+function readMode() {
   try {
-    const t = localStorage.getItem(KEY)
+    const t = localStorage.getItem(THEME_MODE_KEY)
     if (t === 'light' || t === 'dark') return t
   } catch {
     /* ignore */
@@ -27,21 +34,75 @@ function readTheme() {
   }
 }
 
-function applyTheme(t) {
-  document.documentElement.dataset.theme = t
+function readPalette() {
   try {
-    localStorage.setItem(KEY, t)
+    const p = localStorage.getItem(THEME_PALETTE_KEY)
+    if (isValidPalette(p)) return p
+  } catch {
+    /* ignore */
+  }
+  if (typeof document !== 'undefined' && document.documentElement.dataset.palette) {
+    const p = document.documentElement.dataset.palette
+    if (isValidPalette(p)) return p
+  }
+  return DEFAULT_PALETTE
+}
+
+function applyAppearance(mode, palette) {
+  document.documentElement.dataset.theme = mode
+  document.documentElement.dataset.palette = palette
+  try {
+    localStorage.setItem(THEME_MODE_KEY, mode)
+    localStorage.setItem(THEME_PALETTE_KEY, palette)
   } catch {
     /* ignore */
   }
 }
 
+function withViewTransition(fromEl, apply) {
+  if (
+    !document.startViewTransition ||
+    matchMedia('(prefers-reduced-motion: reduce)').matches
+  ) {
+    apply()
+    return
+  }
+  const r = fromEl
+    ? fromEl.getBoundingClientRect()
+    : { left: window.innerWidth - 40, top: 30, width: 0, height: 0 }
+  const x = r.left + r.width / 2
+  const y = r.top + r.height / 2
+  const R = Math.hypot(
+    Math.max(x, window.innerWidth - x),
+    Math.max(y, window.innerHeight - y),
+  )
+  document
+    .startViewTransition(apply)
+    .ready.then(() => {
+      document.documentElement.animate(
+        {
+          clipPath: [
+            `circle(0 at ${x}px ${y}px)`,
+            `circle(${R}px at ${x}px ${y}px)`,
+          ],
+        },
+        {
+          duration: 520,
+          easing: 'cubic-bezier(.22,1,.36,1)',
+          pseudoElement: '::view-transition-new(root)',
+        },
+      )
+    })
+    .catch(() => {})
+}
+
 export function ThemeProvider({ children }) {
-  const [theme, setThemeState] = useState(readTheme)
+  const [theme, setThemeState] = useState(readMode)
+  const [palette, setPaletteState] = useState(readPalette)
 
   useEffect(() => {
-    applyTheme(theme)
-  }, [theme])
+    applyAppearance(theme, palette)
+  }, [theme, palette])
 
   useEffect(() => {
     let mq
@@ -53,7 +114,7 @@ export function ThemeProvider({ children }) {
     const onChange = (e) => {
       let saved = null
       try {
-        saved = localStorage.getItem(KEY)
+        saved = localStorage.getItem(THEME_MODE_KEY)
       } catch {
         /* ignore */
       }
@@ -71,47 +132,27 @@ export function ThemeProvider({ children }) {
     }
   }, [])
 
-  const setTheme = useCallback((t, fromEl) => {
-    const next = t === 'dark' ? 'dark' : 'light'
-    const apply = () => {
-      applyTheme(next)
-      setThemeState(next)
-    }
-    if (
-      !document.startViewTransition ||
-      matchMedia('(prefers-reduced-motion: reduce)').matches
-    ) {
-      apply()
-      return
-    }
-    const r = fromEl
-      ? fromEl.getBoundingClientRect()
-      : { left: window.innerWidth - 40, top: 30, width: 0, height: 0 }
-    const x = r.left + r.width / 2
-    const y = r.top + r.height / 2
-    const R = Math.hypot(
-      Math.max(x, window.innerWidth - x),
-      Math.max(y, window.innerHeight - y),
-    )
-    document
-      .startViewTransition(apply)
-      .ready.then(() => {
-        document.documentElement.animate(
-          {
-            clipPath: [
-              `circle(0 at ${x}px ${y}px)`,
-              `circle(${R}px at ${x}px ${y}px)`,
-            ],
-          },
-          {
-            duration: 520,
-            easing: 'cubic-bezier(.22,1,.36,1)',
-            pseudoElement: '::view-transition-new(root)',
-          },
-        )
+  const setTheme = useCallback(
+    (t, fromEl) => {
+      const next = t === 'dark' ? 'dark' : 'light'
+      withViewTransition(fromEl, () => {
+        applyAppearance(next, palette)
+        setThemeState(next)
       })
-      .catch(() => {})
-  }, [])
+    },
+    [palette],
+  )
+
+  const setPalette = useCallback(
+    (id, fromEl) => {
+      const next = isValidPalette(id) ? id : DEFAULT_PALETTE
+      withViewTransition(fromEl, () => {
+        applyAppearance(theme, next)
+        setPaletteState(next)
+      })
+    },
+    [theme],
+  )
 
   const toggleTheme = useCallback(
     (fromEl) => {
@@ -121,14 +162,23 @@ export function ThemeProvider({ children }) {
   )
 
   const value = useMemo(
-    () => ({ theme, setTheme, toggleTheme, isDark: theme === 'dark' }),
-    [theme, setTheme, toggleTheme],
+    () => ({
+      theme,
+      setTheme,
+      toggleTheme,
+      isDark: theme === 'dark',
+      palette,
+      setPalette,
+      palettes: THEME_PALETTES,
+      paletteMeta: paletteById(palette),
+    }),
+    [theme, setTheme, toggleTheme, palette, setPalette],
   )
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
 
-/** Theme toggle matching v7 setTheme / THEME_BTN behaviour. */
+/** Theme toggle / palette picker matching v7 setTheme behaviour + palettes. */
 export function useTheme() {
   const ctx = useContext(ThemeContext)
   if (!ctx) {

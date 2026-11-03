@@ -7,6 +7,7 @@ import EmptyState from '../../components/EmptyState'
 import Field from '../../components/Field'
 import { Icon } from '../../components/IconSprite'
 import PageTop from '../../components/PageTop'
+import ThemePicker from '../../components/ThemePicker'
 import { useToast } from '../../components/Toast'
 import { formatRelativeTime } from '../../utils/format'
 /**
@@ -184,6 +185,9 @@ export default function Settings() {
         </>
       ) : (
         <>
+          <div style={{ marginBottom: 16 }}>
+            <ThemePicker />
+          </div>
           <div className="grid g2e">
             <div className="panel">
               <div className="panel-h">

@@ -139,9 +139,12 @@ export function navBlueprint(role) {
         ],
       },
       {
-        id: 'tools',
-        label: 'Tools',
-        items: [{ page: 'x-ocr', to: '/ocr', label: 'OCR Studio' }],
+        id: 'account',
+        label: 'Account',
+        items: [
+          { page: 'h-settings', to: '/app/hod/settings', label: 'Settings' },
+          { page: 'x-ocr', to: '/ocr', label: 'OCR Studio' },
+        ],
       },
     ]
   }
@@ -211,6 +214,7 @@ export function navBlueprint(role) {
         label: 'Study',
         items: [
           { page: 's-study', to: '/app/student/study', label: 'Study assistant' },
+          { page: 's-settings', to: '/app/student/settings', label: 'Settings' },
           { page: 'x-ocr', to: '/ocr', label: 'OCR Studio' },
         ],
       },
@@ -311,6 +315,7 @@ export function pageToPath(page, id) {
     'h-review': id ? `/app/hod/approvals/${id}` : '/app/hod/approvals',
     'h-analytics': '/app/hod/analytics',
     'h-policy': '/app/hod/policy',
+    'h-settings': '/app/hod/settings',
     't-dash': '/app/teacher',
     't-classes': '/app/teacher/classes',
     't-class': id ? `/app/teacher/classes/${id}` : '/app/teacher/classes',
@@ -331,6 +336,7 @@ export function pageToPath(page, id) {
     's-results': '/app/student/results',
     's-feedback': id ? `/app/student/attempts/${id}/feedback` : '/app/student/results',
     's-study': '/app/student/study',
+    's-settings': '/app/student/settings',
     'x-ocr': '/ocr',
   }
   return map[page] || null
@@ -364,6 +370,7 @@ export function pathToPage(pathname, search = '') {
     [/^\/app\/hod\/requests$/, 'h-assign'],
     [/^\/app\/hod\/analytics$/, 'h-analytics'],
     [/^\/app\/hod\/policy$/, 'h-policy'],
+    [/^\/app\/hod\/settings$/, 'h-settings'],
     [/^\/app\/hod$/, 'h-dash'],
     [/^\/app\/teacher\/flags$/, 't-flags'],
     [/^\/app\/teacher\/settings$/, 't-settings'],
@@ -377,6 +384,7 @@ export function pathToPage(pathname, search = '') {
     [/^\/app\/teacher\/classes$/, 't-classes'],
     [/^\/app\/teacher$/, 't-dash'],
     [/^\/app\/student\/study$/, 's-study'],
+    [/^\/app\/student\/settings$/, 's-settings'],
     [/^\/app\/student\/attempts\/[^/]+\/feedback$/, 's-feedback'],
     [/^\/app\/student\/attempts\/[^/]+\/done$/, 's-done'],
     [/^\/app\/student\/exams\/[^/]+\/take$/, 's-take'],
@@ -410,6 +418,7 @@ export function activeNavPage(pathname, search = '') {
     'h-approvals',
     'h-analytics',
     'h-policy',
+    'h-settings',
     't-dash',
     't-flags',
     't-classes',
@@ -424,6 +433,7 @@ export function activeNavPage(pathname, search = '') {
     's-classes',
     's-class',
     's-study',
+    's-settings',
     'x-ocr',
   ])
   if (exactLeaves.has(page)) return page

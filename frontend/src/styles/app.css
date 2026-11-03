@@ -484,6 +484,18 @@ h1,h2,h3,h4{letter-spacing:-.02em}
 
 
 
+/* Appearance theme picker (Settings) */
+.theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.theme-card{display:flex;flex-direction:column;align-items:stretch;gap:10px;text-align:left;border:1px solid var(--color-border);background:var(--color-card);border-radius:var(--radius-sm);padding:12px;min-height:0;color:var(--color-foreground);font:inherit;cursor:pointer;transition:border-color var(--t-fast),box-shadow var(--t-fast),transform var(--t-fast)}
+.theme-card:hover{border-color:var(--color-primary);transform:translateY(-1px);box-shadow:var(--shadow-sm)}
+.theme-card.on{border-color:var(--color-primary);box-shadow:inset 0 0 0 1px var(--color-primary),var(--shadow-sm);background:var(--color-primary-muted)}
+.theme-swatches{display:grid;grid-template-columns:1.4fr 1fr 1fr;height:36px;border-radius:8px;overflow:hidden;border:1px solid var(--color-border)}
+.theme-swatches span{display:block;min-width:0}
+.theme-card-txt{display:flex;flex-direction:column;gap:2px}
+.theme-card-txt b{font-size:14.5px;font-weight:650}
+.theme-card-txt .small{color:var(--color-muted-foreground);line-height:1.35}
+.theme-card-check{font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--color-ring)}
+
 /* sidebar categories: each group is a separated block with a heading and indented items */
 .nav-group{margin-top:14px;padding-top:12px;border-top:1px solid var(--color-border)}
 .nav-group:first-child{margin-top:0;padding-top:0;border-top:0}

@@ -1,0 +1,399 @@
+/* Extra appearance palettes (clay/default lives in tokens.css).
+   Applied via html[data-palette="…"] with optional [data-theme="dark"]. */
+
+/* ---------- Violet Bloom ---------- */
+[data-palette="violet"]{
+  --color-background:#F6F5FB;
+  --color-card:#FFFFFF;
+  --color-popover:#FFFFFF;
+  --color-muted:#ECEAF5;
+  --color-foreground:#1B1730;
+  --color-muted-foreground:#6B6685;
+  --color-border:#E0DDED;
+  --color-input:#C4BEDA;
+
+  --color-primary:#8B7CF7;
+  --color-on-primary:#FFFFFF;
+  --color-primary-muted:#EEEBFF;
+  --color-ring:#4C3FB8;
+
+  --color-ai:#4C3FB8;
+  --color-ai-muted:#EEEBFF;
+
+  --color-progress:#9B8CFF;
+  --color-progress-muted:#EEEBFF;
+  --color-progress-fg:#3A2F8F;
+
+  --role-admin:#6B3A6E;
+  --role-hod:#4C3FB8;
+  --role-teacher:#4C3FB8;
+  --role-student:#4C3FB8;
+
+  --hero-glow:radial-gradient(45% 60% at 30% 20%,rgba(139,124,247,.40),transparent 70%),radial-gradient(40% 50% at 75% 15%,rgba(212,120,142,.14),transparent 70%);
+}
+[data-theme="dark"][data-palette="violet"]{
+  --color-background:#100E18;
+  --color-card:#17141F;
+  --color-popover:#1D1A28;
+  --color-muted:#1D1A28;
+  --color-foreground:#F2F0FA;
+  --color-muted-foreground:#B0ABC6;
+  --color-border:#2C2840;
+  --color-input:#3D3858;
+
+  --color-primary:#A99BFF;
+  --color-on-primary:#100E18;
+  --color-primary-muted:rgba(169,155,255,.16);
+  --color-ring:#A99BFF;
+
+  --color-ai:#A99BFF;
+  --color-ai-muted:rgba(169,155,255,.16);
+
+  --role-admin:#E09BB8;
+  --role-hod:#C4B8FF;
+  --role-teacher:#A99BFF;
+  --role-student:#A99BFF;
+
+  --hero-glow:radial-gradient(45% 60% at 30% 20%,rgba(169,155,255,.18),transparent 70%),radial-gradient(40% 50% at 75% 15%,rgba(212,120,142,.10),transparent 70%);
+}
+
+/* ---------- Forest / Emerald ---------- */
+[data-palette="emerald"]{
+  --color-background:#F3F7F4;
+  --color-card:#FFFFFF;
+  --color-popover:#FFFFFF;
+  --color-muted:#E6EEE8;
+  --color-foreground:#14241B;
+  --color-muted-foreground:#5A6E61;
+  --color-border:#D5E0D8;
+  --color-input:#B5C7BB;
+
+  --color-primary:#4FAE7A;
+  --color-on-primary:#FFFFFF;
+  --color-primary-muted:#E4F3EB;
+  --color-ring:#2A6B48;
+
+  --color-ai:#2A6B48;
+  --color-ai-muted:#E4F3EB;
+
+  --color-progress:#6FBF8E;
+  --color-progress-muted:#E4F3EB;
+  --color-progress-fg:#24553B;
+
+  --role-admin:#5A3A2E;
+  --role-hod:#3D6B3A;
+  --role-teacher:#2A6B48;
+  --role-student:#2A6B48;
+
+  --hero-glow:radial-gradient(45% 60% at 30% 20%,rgba(79,174,122,.38),transparent 70%),radial-gradient(40% 50% at 75% 15%,rgba(58,166,184,.12),transparent 70%);
+}
+[data-theme="dark"][data-palette="emerald"]{
+  --color-background:#0C1410;
+  --color-card:#121A15;
+  --color-popover:#18211C;
+  --color-muted:#18211C;
+  --color-foreground:#EAF3ED;
+  --color-muted-foreground:#A7B8AD;
+  --color-border:#26332A;
+  --color-input:#35483C;
+
+  --color-primary:#6FCB94;
+  --color-on-primary:#0C1410;
+  --color-primary-muted:rgba(111,203,148,.16);
+  --color-ring:#6FCB94;
+
+  --color-ai:#6FCB94;
+  --color-ai-muted:rgba(111,203,148,.16);
+
+  --role-admin:#D4A08A;
+  --role-hod:#9AD4A8;
+  --role-teacher:#6FCB94;
+  --role-student:#6FCB94;
+
+  --hero-glow:radial-gradient(45% 60% at 30% 20%,rgba(111,203,148,.16),transparent 70%),radial-gradient(40% 50% at 75% 15%,rgba(58,166,184,.10),transparent 70%);
+}
+
+/* ---------- Ocean ---------- */
+[data-palette="ocean"]{
+  --color-background:#F2F7F8;
+  --color-card:#FFFFFF;
+  --color-popover:#FFFFFF;
+  --color-muted:#E4EEF0;
+  --color-foreground:#102328;
+  --color-muted-foreground:#567078;
+  --color-border:#D2E0E4;
+  --color-input:#AFC6CD;
+
+  --color-primary:#3AA6B8;
+  --color-on-primary:#FFFFFF;
+  --color-primary-muted:#DFF3F6;
+  --color-ring:#1F6A78;
+
+  --color-ai:#1F6A78;
+  --color-ai-muted:#DFF3F6;
+
+  --color-progress:#55B9C8;
+  --color-progress-muted:#DFF3F6;
+  --color-progress-fg:#1A5864;
+
+  --role-admin:#5A3A48;
+  --role-hod:#2A5A78;
+  --role-teacher:#1F6A78;
+  --role-student:#1F6A78;
+
+  --hero-glow:radial-gradient(45% 60% at 30% 20%,rgba(58,166,184,.38),transparent 70%),radial-gradient(40% 50% at 75% 15%,rgba(91,108,255,.12),transparent 70%);
+}
+[data-theme="dark"][data-palette="ocean"]{
+  --color-background:#0B1417;
+  --color-card:#111B1F;
+  --color-popover:#172327;
+  --color-muted:#172327;
+  --color-foreground:#E8F3F5;
+  --color-muted-foreground:#A3B8BE;
+  --color-border:#243438;
+  --color-input:#354A50;
+
+  --color-primary:#55C2D2;
+  --color-on-primary:#0B1417;
+  --color-primary-muted:rgba(85,194,210,.16);
+  --color-ring:#55C2D2;
+
+  --color-ai:#55C2D2;
+  --color-ai-muted:rgba(85,194,210,.16);
+
+  --role-admin:#D4A0B0;
+  --role-hod:#8EC8E0;
+  --role-teacher:#55C2D2;
+  --role-student:#55C2D2;
+
+  --hero-glow:radial-gradient(45% 60% at 30% 20%,rgba(85,194,210,.16),transparent 70%),radial-gradient(40% 50% at 75% 15%,rgba(91,108,255,.10),transparent 70%);
+}
+
+/* ---------- Rosewood ---------- */
+[data-palette="rose"]{
+  --color-background:#F9F4F5;
+  --color-card:#FFFFFF;
+  --color-popover:#FFFFFF;
+  --color-muted:#F0E6E9;
+  --color-foreground:#2A151C;
+  --color-muted-foreground:#7A5A64;
+  --color-border:#E7D6DB;
+  --color-input:#D0B4BC;
+
+  --color-primary:#D4788E;
+  --color-on-primary:#FFFFFF;
+  --color-primary-muted:#F8E7EC;
+  --color-ring:#8A3F54;
+
+  --color-ai:#8A3F54;
+  --color-ai-muted:#F8E7EC;
+
+  --color-progress:#E095A8;
+  --color-progress-muted:#F8E7EC;
+  --color-progress-fg:#6E3244;
+
+  --role-admin:#713C35;
+  --role-hod:#8A3F54;
+  --role-teacher:#8A3F54;
+  --role-student:#8A3F54;
+
+  --hero-glow:radial-gradient(45% 60% at 30% 20%,rgba(212,120,142,.40),transparent 70%),radial-gradient(40% 50% at 75% 15%,rgba(224,137,92,.14),transparent 70%);
+}
+[data-theme="dark"][data-palette="rose"]{
+  --color-background:#140E11;
+  --color-card:#1B1418;
+  --color-popover:#221A1F;
+  --color-muted:#221A1F;
+  --color-foreground:#F8EEF1;
+  --color-muted-foreground:#C0A8B0;
+  --color-border:#35282E;
+  --color-input:#4A3840;
+
+  --color-primary:#E89BB0;
+  --color-on-primary:#140E11;
+  --color-primary-muted:rgba(232,155,176,.16);
+  --color-ring:#E89BB0;
+
+  --color-ai:#E89BB0;
+  --color-ai-muted:rgba(232,155,176,.16);
+
+  --role-admin:#BD7064;
+  --role-hod:#E0A8B8;
+  --role-teacher:#E89BB0;
+  --role-student:#E89BB0;
+
+  --hero-glow:radial-gradient(45% 60% at 30% 20%,rgba(232,155,176,.16),transparent 70%),radial-gradient(40% 50% at 75% 15%,rgba(224,137,92,.10),transparent 70%);
+}
+
+/* ---------- Slate ---------- */
+[data-palette="slate"]{
+  --color-background:#F4F6F8;
+  --color-card:#FFFFFF;
+  --color-popover:#FFFFFF;
+  --color-muted:#E8ECF0;
+  --color-foreground:#151A20;
+  --color-muted-foreground:#5E6A78;
+  --color-border:#D5DCE4;
+  --color-input:#B4BFC9;
+
+  --color-primary:#6B859E;
+  --color-on-primary:#FFFFFF;
+  --color-primary-muted:#E6ECF2;
+  --color-ring:#3D5368;
+
+  --color-ai:#3D5368;
+  --color-ai-muted:#E6ECF2;
+
+  --color-progress:#7F97AD;
+  --color-progress-muted:#E6ECF2;
+  --color-progress-fg:#334556;
+
+  --role-admin:#5A3A3A;
+  --role-hod:#3D5368;
+  --role-teacher:#3D5368;
+  --role-student:#3D5368;
+
+  --hero-glow:radial-gradient(45% 60% at 30% 20%,rgba(107,133,158,.35),transparent 70%),radial-gradient(40% 50% at 75% 15%,rgba(137,152,162,.14),transparent 70%);
+}
+[data-theme="dark"][data-palette="slate"]{
+  --color-background:#0E1115;
+  --color-card:#15191E;
+  --color-popover:#1B2026;
+  --color-muted:#1B2026;
+  --color-foreground:#EEF1F4;
+  --color-muted-foreground:#A8B2BD;
+  --color-border:#2A3139;
+  --color-input:#3C4652;
+
+  --color-primary:#8BA3B8;
+  --color-on-primary:#0E1115;
+  --color-primary-muted:rgba(139,163,184,.16);
+  --color-ring:#8BA3B8;
+
+  --color-ai:#8BA3B8;
+  --color-ai-muted:rgba(139,163,184,.16);
+
+  --role-admin:#BD8A8A;
+  --role-hod:#A8BDCE;
+  --role-teacher:#8BA3B8;
+  --role-student:#8BA3B8;
+
+  --hero-glow:radial-gradient(45% 60% at 30% 20%,rgba(139,163,184,.14),transparent 70%),radial-gradient(40% 50% at 75% 15%,rgba(137,152,162,.10),transparent 70%);
+}
+
+/* ---------- Coral ---------- */
+[data-palette="coral"]{
+  --color-background:#F9F5F1;
+  --color-card:#FFFFFF;
+  --color-popover:#FFFFFF;
+  --color-muted:#F0E8E0;
+  --color-foreground:#27160F;
+  --color-muted-foreground:#7A6254;
+  --color-border:#E5D7CB;
+  --color-input:#CDB8A6;
+
+  --color-primary:#E0895C;
+  --color-on-primary:#FFFFFF;
+  --color-primary-muted:#F8E9DF;
+  --color-ring:#8F4C2A;
+
+  --color-ai:#8F4C2A;
+  --color-ai-muted:#F8E9DF;
+
+  --color-progress:#EBA078;
+  --color-progress-muted:#F8E9DF;
+  --color-progress-fg:#6F3A20;
+
+  --role-admin:#713C35;
+  --role-hod:#8F4C2A;
+  --role-teacher:#8F4C2A;
+  --role-student:#8F4C2A;
+
+  --hero-glow:radial-gradient(45% 60% at 30% 20%,rgba(224,137,92,.42),transparent 70%),radial-gradient(40% 50% at 75% 15%,rgba(245,207,91,.14),transparent 70%);
+}
+[data-theme="dark"][data-palette="coral"]{
+  --color-background:#120E0B;
+  --color-card:#1A1511;
+  --color-popover:#211B16;
+  --color-muted:#211B16;
+  --color-foreground:#F7F0EA;
+  --color-muted-foreground:#C0AFA2;
+  --color-border:#342B24;
+  --color-input:#4A3C32;
+
+  --color-primary:#F0A078;
+  --color-on-primary:#120E0B;
+  --color-primary-muted:rgba(240,160,120,.16);
+  --color-ring:#F0A078;
+
+  --color-ai:#F0A078;
+  --color-ai-muted:rgba(240,160,120,.16);
+
+  --role-admin:#BD7064;
+  --role-hod:#E8B090;
+  --role-teacher:#F0A078;
+  --role-student:#F0A078;
+
+  --hero-glow:radial-gradient(45% 60% at 30% 20%,rgba(240,160,120,.16),transparent 70%),radial-gradient(40% 50% at 75% 15%,rgba(245,207,91,.10),transparent 70%);
+}
+
+/* ---------- Indigo Night ---------- */
+[data-palette="indigo"]{
+  --color-background:#F3F4FB;
+  --color-card:#FFFFFF;
+  --color-popover:#FFFFFF;
+  --color-muted:#E7E9F4;
+  --color-foreground:#121428;
+  --color-muted-foreground:#5C6182;
+  --color-border:#D6DAEC;
+  --color-input:#B4BAD8;
+
+  --color-primary:#5B6CFF;
+  --color-on-primary:#FFFFFF;
+  --color-primary-muted:#E5E8FF;
+  --color-ring:#2F3DB8;
+
+  --color-ai:#2F3DB8;
+  --color-ai-muted:#E5E8FF;
+
+  --color-progress:#7A88FF;
+  --color-progress-muted:#E5E8FF;
+  --color-progress-fg:#27339A;
+
+  --role-admin:#5A3A6E;
+  --role-hod:#2F3DB8;
+  --role-teacher:#2F3DB8;
+  --role-student:#2F3DB8;
+
+  --hero-glow:radial-gradient(45% 60% at 30% 20%,rgba(91,108,255,.38),transparent 70%),radial-gradient(40% 50% at 75% 15%,rgba(139,124,247,.14),transparent 70%);
+}
+[data-theme="dark"][data-palette="indigo"]{
+  --color-background:#0C0E1A;
+  --color-card:#121525;
+  --color-popover:#181C2E;
+  --color-muted:#181C2E;
+  --color-foreground:#ECEFFC;
+  --color-muted-foreground:#A6ACC8;
+  --color-border:#272C44;
+  --color-input:#383F60;
+
+  --color-primary:#8B97FF;
+  --color-on-primary:#0C0E1A;
+  --color-primary-muted:rgba(139,151,255,.16);
+  --color-ring:#8B97FF;
+
+  --color-ai:#8B97FF;
+  --color-ai-muted:rgba(139,151,255,.16);
+
+  --role-admin:#C4A0D8;
+  --role-hod:#A8B2FF;
+  --role-teacher:#8B97FF;
+  --role-student:#8B97FF;
+
+  --hero-glow:radial-gradient(45% 60% at 30% 20%,rgba(139,151,255,.16),transparent 70%),radial-gradient(40% 50% at 75% 15%,rgba(169,155,255,.10),transparent 70%);
+}
+
+/* Ensure clay is explicit when selected (matches tokens.css defaults). */
+[data-palette="clay"]{
+  /* inherits :root / [data-theme=dark] from tokens.css */
+}

@@ -6,6 +6,7 @@ import Review from './Review'
 import Requests from './Requests'
 import Analytics from './Analytics'
 import Policy from './Policy'
+import AppearanceSettings from '../shared/AppearanceSettings'
 import NotFound from '../NotFound'
 
 /** HOD portal routes inside AppShell (ARCHITECTURE F6). */
@@ -19,6 +20,7 @@ export default function HodApp() {
         <Route path="approvals/:id" element={<Review />} />
         <Route path="analytics" element={<Analytics />} />
         <Route path="policy" element={<Policy />} />
+        <Route path="settings" element={<AppearanceSettings />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
     </AppShell>

@@ -5,6 +5,7 @@ import { ShellError, ShellLoading } from '../../components/AppShell'
 import Field from '../../components/Field'
 import { Icon } from '../../components/IconSprite'
 import PageTop from '../../components/PageTop'
+import ThemePicker from '../../components/ThemePicker'
 import { useToast } from '../../components/Toast'
 
 /**
@@ -123,8 +124,12 @@ export default function Settings() {
     <>
       <PageTop
         title="Settings"
-        subtitle="Use your own OpenRouter or Groq key for exam generation, or keep the platform default."
+        subtitle="Appearance, plus your exam-generation LLM (platform default or your own key)."
       />
+
+      <div style={{ marginBottom: 16 }}>
+        <ThemePicker />
+      </div>
 
       <form className="panel" onSubmit={onSave} style={{ maxWidth: 640 }}>
         <div className="panel-h">
@@ -188,7 +193,7 @@ export default function Settings() {
             </>
           ) : (
             <p className="small" style={{ margin: 0 }}>
-              Platform default uses the server LLM key and model configured by your admin.
+              Platform default uses the server LLM (VyceAI Claude Sonnet 4.6) configured by your admin.
             </p>
           )}
 
