@@ -144,51 +144,55 @@ function newCountRow(materialId, typeLabel = 'Long', count = 1, unitKeys = []) {
 function SlidePicker({ units, selectedKeys, disabled, onChange }) {
   if (!units.length) {
     return (
-      <p className="small" style={{ margin: '4px 0', color: 'var(--muted, #888)' }}>
+      <p className="small slide-picker-empty">
         No named slides/pages found in this material yet.
       </p>
     )
   }
+  const selected = units.filter((u) => selectedKeys.includes(u.key))
   return (
-    <div
-      className="mat-list"
-      style={{
-        maxHeight: 160,
-        overflow: 'auto',
-        border: '1px solid var(--border, #ddd)',
-        borderRadius: 8,
-        padding: '6px 8px',
-        marginTop: 4,
-      }}
-    >
-      {units.map((u) => {
-        const on = selectedKeys.includes(u.key)
-        return (
-          <label
-            key={u.key}
-            className="row"
-            style={{ gap: 8, alignItems: 'flex-start', marginBottom: 4 }}
-          >
-            <input
-              type="checkbox"
-              checked={on}
+    <div className="slide-picker">
+      {selected.length ? (
+        <div className="slide-chips" aria-label="Selected slides">
+          {selected.map((u) => (
+            <button
+              key={u.key}
+              type="button"
+              className="slide-chip"
               disabled={disabled}
-              onChange={() => {
-                const next = on
-                  ? selectedKeys.filter((k) => k !== u.key)
-                  : [...selectedKeys, u.key]
-                onChange(next)
-              }}
-            />
-            <span className="small" style={{ lineHeight: 1.35 }}>
-              {u.label}
-              {u.page != null ? (
-                <span style={{ opacity: 0.55 }}> · #{u.page}</span>
-              ) : null}
-            </span>
-          </label>
-        )
-      })}
+              onClick={() => onChange(selectedKeys.filter((k) => k !== u.key))}
+              title="Remove"
+            >
+              <span className="slide-chip-lab">{u.label}</span>
+              <span aria-hidden="true">×</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+      <div className="slide-picker-list" role="group" aria-label="Slides and pages">
+        {units.map((u) => {
+          const on = selectedKeys.includes(u.key)
+          return (
+            <label key={u.key} className={`slide-opt${on ? ' on' : ''}`}>
+              <input
+                type="checkbox"
+                checked={on}
+                disabled={disabled}
+                onChange={() => {
+                  const next = on
+                    ? selectedKeys.filter((k) => k !== u.key)
+                    : [...selectedKeys, u.key]
+                  onChange(next)
+                }}
+              />
+              <span className="slide-opt-lab">
+                {u.label}
+                {u.page != null ? <span className="slide-opt-pg">#{u.page}</span> : null}
+              </span>
+            </label>
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -223,7 +227,6 @@ export default function CreateExam() {
   const [busy, setBusy] = useState(false)
   const [titleTouched, setTitleTouched] = useState(false)
   const [blueprintOn, setBlueprintOn] = useState(false)
-  const [blueprintMode, setBlueprintMode] = useState('weightage') // 'weightage' | 'counts'
   const [outlines, setOutlines] = useState({}) // materialId -> named units
   const [weightRows, setWeightRows] = useState([])
   const [pinRows, setPinRows] = useState([])
@@ -392,7 +395,7 @@ export default function CreateExam() {
     )
   }
 
-  function enableBlueprintDefaults(mode = blueprintMode) {
+  function enableBlueprintDefaults() {
     const mid = materialIds[0]
     if (!mid) return
     const units = outlines[mid] || []
@@ -400,22 +403,17 @@ export default function CreateExam() {
     const cut = Math.max(1, Math.floor(keys.length * 0.4))
     const firstKeys = keys.slice(0, cut)
     const restKeys = keys.slice(cut)
-    if (mode === 'counts') {
-      const longLabel =
-        qTypes.find((t) => /long|essay/i.test(t.label))?.label ||
-        qTypes[qTypes.length - 1]?.label ||
-        'Long'
-      setPinRows([
-        newCountRow(mid, longLabel, 1, restKeys.length ? restKeys.slice(0, 1) : keys.slice(0, 1)),
-      ])
-      setWeightRows([])
-    } else {
-      setWeightRows([
-        newWeightRow(mid, firstKeys.length ? firstKeys : keys.slice(0, 1), 30),
-        newWeightRow(mid, restKeys.length ? restKeys : keys.slice(-1), 70),
-      ])
-      setPinRows([])
-    }
+    const longLabel =
+      qTypes.find((t) => /long|essay/i.test(t.label))?.label ||
+      qTypes[qTypes.length - 1]?.label ||
+      'Long'
+    setWeightRows([
+      newWeightRow(mid, firstKeys.length ? firstKeys : keys.slice(0, 1), 30),
+      newWeightRow(mid, restKeys.length ? restKeys : keys.slice(-1), 70),
+    ])
+    setPinRows([
+      newCountRow(mid, longLabel, 1, restKeys.length ? restKeys.slice(0, 1) : keys.slice(0, 1)),
+    ])
   }
 
   function validate() {
@@ -441,31 +439,33 @@ export default function CreateExam() {
       }
     }
     if (blueprintOn) {
-      if (blueprintMode === 'weightage') {
-        if (!weightRows.length) errs.blueprint = 'Add at least one slide group with weightage'
+      if (!weightRows.length && !pinRows.length) {
+        errs.blueprint = 'Add weightage groups and/or pin rules, or turn blueprint off'
+      }
+      if (weightRows.length) {
         const sum = weightRows.reduce((s, r) => s + (Number(r.weight_pct) || 0), 0)
-        if (weightRows.length && Math.abs(sum - 100) > 0.5) {
+        if (Math.abs(sum - 100) > 0.5) {
           errs.blueprint = 'Weightage percentages must add up to 100'
         }
         for (const r of weightRows) {
           if (!materialIds.includes(r.material_id)) errs.blueprint = 'Weightage must use a selected material'
-          if (!(r.unitKeys || []).length) errs.blueprint = 'Select at least one slide/page in each weightage group'
-        }
-      } else {
-        if (!pinRows.length) errs.blueprint = 'Add at least one slide → question-count rule'
-        const pinned = {}
-        for (const p of pinRows) {
-          if (!materialIds.includes(p.material_id)) errs.blueprint = 'Rule must use a selected material'
-          if (!(Number(p.count) >= 1)) errs.blueprint = 'Each rule needs a count of at least 1'
-          if (!(p.unitKeys || []).length) errs.blueprint = 'Select at least one slide/page in each count rule'
-          const lab = String(p.type_label || '').trim()
-          if (!qTypes.some((t) => t.label === lab)) errs.blueprint = 'Type must match a question type name'
-          pinned[lab] = (pinned[lab] || 0) + (Number(p.count) || 0)
-        }
-        for (const t of qTypes) {
-          if ((pinned[t.label] || 0) > (Number(t.count) || 0)) {
-            errs.blueprint = `${t.label} counts exceed the total for that type`
+          if (!(r.unitKeys || []).length) {
+            errs.blueprint = 'Select at least one slide/page in each weightage group'
           }
+        }
+      }
+      const pinned = {}
+      for (const p of pinRows) {
+        if (!materialIds.includes(p.material_id)) errs.blueprint = 'Pin must use a selected material'
+        if (!(Number(p.count) >= 1)) errs.blueprint = 'Each pin needs a count of at least 1'
+        if (!(p.unitKeys || []).length) errs.blueprint = 'Select at least one slide/page in each pin rule'
+        const lab = String(p.type_label || '').trim()
+        if (!qTypes.some((t) => t.label === lab)) errs.blueprint = 'Pin type must match a question type name'
+        pinned[lab] = (pinned[lab] || 0) + (Number(p.count) || 0)
+      }
+      for (const t of qTypes) {
+        if ((pinned[t.label] || 0) > (Number(t.count) || 0)) {
+          errs.blueprint = `Pinned ${t.label} questions exceed the total count`
         }
       }
     }
@@ -497,7 +497,7 @@ export default function CreateExam() {
     }
     if (linkedReq) body.request_id = linkedReq
     if (blueprintOn) {
-      if (blueprintMode === 'weightage' && weightRows.length) {
+      if (weightRows.length) {
         body.weightage = weightRows.map((r) => {
           const scope = scopeFromUnits(r.material_id, r.unitKeys || [], outlines)
           return {
@@ -506,7 +506,7 @@ export default function CreateExam() {
           }
         })
       }
-      if (blueprintMode === 'counts' && pinRows.length) {
+      if (pinRows.length) {
         body.pins = pinRows.map((p) => {
           const scope = scopeFromUnits(p.material_id, p.unitKeys || [], outlines)
           return {
@@ -848,8 +848,8 @@ export default function CreateExam() {
 
             <h3 style={{ fontSize: 15.5, margin: '12px 0 4px' }}>Paper blueprint</h3>
             <p className="small" style={{ margin: '0 0 10px' }}>
-              Optional. Pick slides/pages by name, then either set weightage or lock how many MCQ /
-              Short / Long questions come from those slides.
+              Optional. Use weightage groups and pin rules together — pins take from the matching
+              weight band first, then the rest of that band fills from its slides.
             </p>
             <label className="row" style={{ gap: 8, marginBottom: 10, alignItems: 'center' }}>
               <input
@@ -859,7 +859,7 @@ export default function CreateExam() {
                 onChange={(e) => {
                   const on = e.target.checked
                   setBlueprintOn(on)
-                  if (on && !weightRows.length && !pinRows.length) enableBlueprintDefaults(blueprintMode)
+                  if (on && !weightRows.length && !pinRows.length) enableBlueprintDefaults()
                 }}
               />
               <span>Use slide/page blueprint</span>
@@ -870,11 +870,11 @@ export default function CreateExam() {
               </p>
             ) : null}
             {blueprintOn ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 14 }}>
+              <div className="blueprint-panel">
                 {outlineBusy ? (
                   <p className="small">Loading slide/page names…</p>
                 ) : (
-                  <p className="small" style={{ margin: 0 }}>
+                  <p className="small blueprint-outline">
                     {materialIds
                       .map((id) => {
                         const m = materials.find((x) => x.id === id)
@@ -885,256 +885,203 @@ export default function CreateExam() {
                   </p>
                 )}
 
-                <div className="row" style={{ gap: 14, flexWrap: 'wrap' }}>
-                  <label className="small" style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <input
-                      type="radio"
-                      name="cf-blueprint-mode"
-                      checked={blueprintMode === 'weightage'}
+                <div className="blueprint-section">
+                  <div className="row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+                    <b style={{ fontSize: 14 }}>1) Weightage by slide group</b>
+                    <button
+                      type="button"
+                      className="btn small"
                       disabled={busy}
-                      onChange={() => {
-                        setBlueprintMode('weightage')
-                        if (!weightRows.length) enableBlueprintDefaults('weightage')
-                        else setPinRows([])
-                      }}
-                    />
-                    1) Select slides → weightage %
-                  </label>
-                  <label className="small" style={{ display: 'inline-flex', gap: 6, alignItems: 'center' }}>
-                    <input
-                      type="radio"
-                      name="cf-blueprint-mode"
-                      checked={blueprintMode === 'counts'}
-                      disabled={busy}
-                      onChange={() => {
-                        setBlueprintMode('counts')
-                        if (!pinRows.length) enableBlueprintDefaults('counts')
-                        else setWeightRows([])
-                      }}
-                    />
-                    2) Select slides → no. of Short / MCQ / Long
-                  </label>
-                </div>
-
-                {blueprintMode === 'weightage' ? (
-                  <div>
-                    <div className="row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
-                      <b style={{ fontSize: 14 }}>Slide groups + weightage</b>
-                      <button
-                        type="button"
-                        className="btn small"
-                        disabled={busy}
-                        onClick={() =>
-                          setWeightRows((prev) => [
-                            ...prev,
-                            newWeightRow(materialIds[0], [], Math.max(1, 100 - weightSum)),
-                          ])
-                        }
-                      >
-                        <Icon name="plus" className="sm" /> Add group
-                      </button>
-                    </div>
-                    <p className="small" style={{ margin: '0 0 8px' }}>
-                      Sum of weights: {weightSum}%{' '}
-                      {Math.abs(weightSum - 100) <= 0.5 ? '(ok)' : '(must be 100)'}
-                    </p>
-                    {weightRows.map((r) => (
-                      <div
-                        key={r.id}
-                        style={{
-                          marginBottom: 10,
-                          padding: '10px 12px',
-                          border: '1px solid var(--border, #ddd)',
-                          borderRadius: 10,
-                        }}
-                      >
-                        <div className="qtype-row" style={{ marginBottom: 6 }}>
-                          {materialIds.length > 1 ? (
-                            <select
-                              value={r.material_id}
-                              disabled={busy}
-                              onChange={(e) =>
-                                setWeightRows((prev) =>
-                                  prev.map((x) =>
-                                    x.id === r.id
-                                      ? { ...x, material_id: e.target.value, unitKeys: [] }
-                                      : x,
-                                  ),
-                                )
-                              }
-                            >
-                              {materialIds.map((id) => (
-                                <option key={id} value={id}>
-                                  {materials.find((m) => m.id === id)?.name || id}
-                                </option>
-                              ))}
-                            </select>
-                          ) : null}
-                          <label className="small">
-                            Weight %
-                            <input
-                              type="number"
-                              min={1}
-                              max={100}
-                              value={r.weight_pct}
-                              disabled={busy}
-                              onChange={(e) =>
-                                setWeightRows((prev) =>
-                                  prev.map((x) =>
-                                    x.id === r.id ? { ...x, weight_pct: e.target.value } : x,
-                                  ),
-                                )
-                              }
-                            />
-                          </label>
-                          <button
-                            type="button"
-                            className="btn small ghost"
-                            disabled={busy}
-                            aria-label="Remove weightage group"
-                            onClick={() => setWeightRows((prev) => prev.filter((x) => x.id !== r.id))}
-                          >
-                            <Icon name="x" className="sm" />
-                          </button>
-                        </div>
-                        <p className="small" style={{ margin: '0 0 2px' }}>
-                          Select slides/pages by name
-                        </p>
-                        <SlidePicker
-                          units={outlines[r.material_id] || []}
-                          selectedKeys={r.unitKeys || []}
-                          disabled={busy}
-                          onChange={(keys) =>
-                            setWeightRows((prev) =>
-                              prev.map((x) => (x.id === r.id ? { ...x, unitKeys: keys } : x)),
-                            )
-                          }
-                        />
-                      </div>
-                    ))}
+                      onClick={() =>
+                        setWeightRows((prev) => [
+                          ...prev,
+                          newWeightRow(materialIds[0], [], Math.max(1, 100 - weightSum)),
+                        ])
+                      }
+                    >
+                      <Icon name="plus" className="sm" /> Add group
+                    </button>
                   </div>
-                ) : (
-                  <div>
-                    <div className="row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
-                      <b style={{ fontSize: 14 }}>Slides → question counts</b>
-                      <button
-                        type="button"
-                        className="btn small"
-                        disabled={busy}
-                        onClick={() =>
-                          setPinRows((prev) => [
-                            ...prev,
-                            newCountRow(
-                              materialIds[0],
-                              qTypes.find((t) => /long|essay/i.test(t.label))?.label ||
-                                qTypes[qTypes.length - 1]?.label ||
-                                'Long',
-                              1,
-                              [],
-                            ),
-                          ])
-                        }
-                      >
-                        <Icon name="plus" className="sm" /> Add rule
-                      </button>
-                    </div>
-                    <p className="small" style={{ margin: '0 0 8px' }}>
-                      Example: pick “Nuclear Binding Energy”, set 2 Long + add another rule for 6
-                      Short from the same slides. Remaining questions (if any) use all material.
-                    </p>
-                    {pinRows.map((p) => (
-                      <div
-                        key={p.id}
-                        style={{
-                          marginBottom: 10,
-                          padding: '10px 12px',
-                          border: '1px solid var(--border, #ddd)',
-                          borderRadius: 10,
-                        }}
-                      >
-                        <div className="qtype-row" style={{ marginBottom: 6 }}>
+                  <p className="small" style={{ margin: '0 0 8px' }}>
+                    Sum of weights: {weightSum}%{' '}
+                    {Math.abs(weightSum - 100) <= 0.5 ? '(ok)' : '(must be 100 if you use groups)'}
+                  </p>
+                  {weightRows.map((r) => (
+                    <div key={r.id} className="blueprint-group">
+                      <div className="qtype-row" style={{ marginBottom: 8 }}>
+                        {materialIds.length > 1 ? (
                           <select
-                            value={p.type_label}
+                            value={r.material_id}
                             disabled={busy}
                             onChange={(e) =>
-                              setPinRows((prev) =>
+                              setWeightRows((prev) =>
                                 prev.map((x) =>
-                                  x.id === p.id ? { ...x, type_label: e.target.value } : x,
+                                  x.id === r.id
+                                    ? { ...x, material_id: e.target.value, unitKeys: [] }
+                                    : x,
                                 ),
                               )
                             }
                           >
-                            {qTypes.map((t) => (
-                              <option key={t.id} value={t.label}>
-                                {t.label}
+                            {materialIds.map((id) => (
+                              <option key={id} value={id}>
+                                {materials.find((m) => m.id === id)?.name || id}
                               </option>
                             ))}
                           </select>
-                          <label className="small">
-                            Count
-                            <input
-                              type="number"
-                              min={1}
-                              max={QUESTION_CAP}
-                              value={p.count}
-                              disabled={busy}
-                              onChange={(e) =>
-                                setPinRows((prev) =>
-                                  prev.map((x) =>
-                                    x.id === p.id ? { ...x, count: e.target.value } : x,
-                                  ),
-                                )
-                              }
-                            />
-                          </label>
-                          {materialIds.length > 1 ? (
-                            <select
-                              value={p.material_id}
-                              disabled={busy}
-                              onChange={(e) =>
-                                setPinRows((prev) =>
-                                  prev.map((x) =>
-                                    x.id === p.id
-                                      ? { ...x, material_id: e.target.value, unitKeys: [] }
-                                      : x,
-                                  ),
-                                )
-                              }
-                            >
-                              {materialIds.map((id) => (
-                                <option key={id} value={id}>
-                                  {materials.find((m) => m.id === id)?.name || id}
-                                </option>
-                              ))}
-                            </select>
-                          ) : null}
-                          <button
-                            type="button"
-                            className="btn small ghost"
+                        ) : null}
+                        <label className="small">
+                          Weight %
+                          <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={r.weight_pct}
                             disabled={busy}
-                            aria-label="Remove count rule"
-                            onClick={() => setPinRows((prev) => prev.filter((x) => x.id !== p.id))}
-                          >
-                            <Icon name="x" className="sm" />
-                          </button>
-                        </div>
-                        <p className="small" style={{ margin: '0 0 2px' }}>
-                          Select slides/pages by name
-                        </p>
-                        <SlidePicker
-                          units={outlines[p.material_id] || []}
-                          selectedKeys={p.unitKeys || []}
+                            onChange={(e) =>
+                              setWeightRows((prev) =>
+                                prev.map((x) =>
+                                  x.id === r.id ? { ...x, weight_pct: e.target.value } : x,
+                                ),
+                              )
+                            }
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className="btn small ghost"
                           disabled={busy}
-                          onChange={(keys) =>
+                          aria-label="Remove weightage group"
+                          onClick={() => setWeightRows((prev) => prev.filter((x) => x.id !== r.id))}
+                        >
+                          <Icon name="x" className="sm" />
+                        </button>
+                      </div>
+                      <p className="small blueprint-group-lab">Select slides/pages by name</p>
+                      <SlidePicker
+                        units={outlines[r.material_id] || []}
+                        selectedKeys={r.unitKeys || []}
+                        disabled={busy}
+                        onChange={(keys) =>
+                          setWeightRows((prev) =>
+                            prev.map((x) => (x.id === r.id ? { ...x, unitKeys: keys } : x)),
+                          )
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
+
+                <div className="blueprint-section">
+                  <div className="row" style={{ justifyContent: 'space-between', marginBottom: 6 }}>
+                    <b style={{ fontSize: 14 }}>2) Pin question counts to slides</b>
+                    <button
+                      type="button"
+                      className="btn small"
+                      disabled={busy}
+                      onClick={() =>
+                        setPinRows((prev) => [
+                          ...prev,
+                          newCountRow(
+                            materialIds[0],
+                            qTypes.find((t) => /long|essay/i.test(t.label))?.label ||
+                              qTypes[qTypes.length - 1]?.label ||
+                              'Long',
+                            1,
+                            [],
+                          ),
+                        ])
+                      }
+                    >
+                      <Icon name="plus" className="sm" /> Add pin
+                    </button>
+                  </div>
+                  <p className="small" style={{ margin: '0 0 8px' }}>
+                    Example: 1 Long from slide 3 is taken from that slide’s weight band first; the
+                    remaining band share comes from the other slides in the group.
+                  </p>
+                  {pinRows.map((p) => (
+                    <div key={p.id} className="blueprint-group">
+                      <div className="qtype-row" style={{ marginBottom: 8 }}>
+                        <select
+                          value={p.type_label}
+                          disabled={busy}
+                          onChange={(e) =>
                             setPinRows((prev) =>
-                              prev.map((x) => (x.id === p.id ? { ...x, unitKeys: keys } : x)),
+                              prev.map((x) =>
+                                x.id === p.id ? { ...x, type_label: e.target.value } : x,
+                              ),
                             )
                           }
-                        />
+                        >
+                          {qTypes.map((t) => (
+                            <option key={t.id} value={t.label}>
+                              {t.label}
+                            </option>
+                          ))}
+                        </select>
+                        <label className="small">
+                          Count
+                          <input
+                            type="number"
+                            min={1}
+                            max={QUESTION_CAP}
+                            value={p.count}
+                            disabled={busy}
+                            onChange={(e) =>
+                              setPinRows((prev) =>
+                                prev.map((x) =>
+                                  x.id === p.id ? { ...x, count: e.target.value } : x,
+                                ),
+                              )
+                            }
+                          />
+                        </label>
+                        {materialIds.length > 1 ? (
+                          <select
+                            value={p.material_id}
+                            disabled={busy}
+                            onChange={(e) =>
+                              setPinRows((prev) =>
+                                prev.map((x) =>
+                                  x.id === p.id
+                                    ? { ...x, material_id: e.target.value, unitKeys: [] }
+                                    : x,
+                                ),
+                              )
+                            }
+                          >
+                            {materialIds.map((id) => (
+                              <option key={id} value={id}>
+                                {materials.find((m) => m.id === id)?.name || id}
+                              </option>
+                            ))}
+                          </select>
+                        ) : null}
+                        <button
+                          type="button"
+                          className="btn small ghost"
+                          disabled={busy}
+                          aria-label="Remove pin"
+                          onClick={() => setPinRows((prev) => prev.filter((x) => x.id !== p.id))}
+                        >
+                          <Icon name="x" className="sm" />
+                        </button>
                       </div>
-                    ))}
-                  </div>
-                )}
+                      <p className="small blueprint-group-lab">Select slides/pages by name</p>
+                      <SlidePicker
+                        units={outlines[p.material_id] || []}
+                        selectedKeys={p.unitKeys || []}
+                        disabled={busy}
+                        onChange={(keys) =>
+                          setPinRows((prev) =>
+                            prev.map((x) => (x.id === p.id ? { ...x, unitKeys: keys } : x)),
+                          )
+                        }
+                      />
+                    </div>
+                  ))}
+                </div>
               </div>
             ) : null}
 

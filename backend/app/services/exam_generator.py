@@ -335,6 +335,81 @@ def _is_quality_fail(pass_val) -> bool:
     return False
 
 
+FILL_PASSES = 2
+
+
+async def _fill_shortfall(
+    llm: LLMClient,
+    chunks: list[dict],
+    counts: dict[str, int],
+    clos: list[str],
+    questions: list[dict],
+    warnings: list[str],
+    *,
+    formats: dict[str, str] | None = None,
+    max_passes: int = FILL_PASSES,
+) -> list[dict]:
+    """Retry LLM generation for missing type counts against the full material pool."""
+    from app.services.exam_blueprint import shortfall_counts
+
+    out = list(questions)
+    for pass_i in range(max_passes):
+        missing = shortfall_counts(counts, out)
+        if not missing:
+            return out
+        source = select_source_chunks(chunks)
+        if not source:
+            break
+        try:
+            # Prefer one type per call so free models don't truncate.
+            for label, need in missing.items():
+                batch, warns = await _call_llm_for_questions(
+                    llm,
+                    source,
+                    {label: need},
+                    clos,
+                    formats=formats,
+                    avoid_texts=[q.get("text", "") for q in out if q.get("text")],
+                )
+                warnings.extend(warns)
+                added = 0
+                for q in batch:
+                    if q.get("type") != label:
+                        continue
+                    if _is_duplicate(q, out):
+                        continue
+                    out.append(q)
+                    added += 1
+                    if added >= need:
+                        break
+            warnings.append(
+                f"Fill pass {pass_i + 1}: requested "
+                + ", ".join(f"{n} {t}" for t, n in missing.items())
+                + "."
+            )
+        except LLMError as exc:
+            warnings.append(f"Fill pass {pass_i + 1} failed: {exc}")
+            break
+
+    still = shortfall_counts(counts, out)
+    if still:
+        parts = [f"{n} {t}" for t, n in still.items()]
+        warnings.append(
+            "Still short after fill attempts: " + ", ".join(parts) + "."
+        )
+    return out
+
+
+def _slice_to_counts(questions: list[dict], counts: dict[str, int]) -> list[dict]:
+    by_type: dict[str, list[dict]] = {t: [] for t in counts}
+    for q in questions:
+        by_type.setdefault(q["type"], []).append(q)
+    final: list[dict] = []
+    for t in counts:
+        final.extend(by_type.get(t, [])[: counts[t]])
+    return final
+
+
 async def generate_questions(
     llm: LLMClient,
     chunks: list[dict],
@@ -396,6 +471,10 @@ async def generate_questions(
     # validation already ran; keep the draft and warn.
     warnings.append("Quality filter skipped to keep generation under the platform time limit.")
 
+    questions = await _fill_shortfall(
+        llm, chunks, counts, clos, questions, warnings, formats=formats
+    )
+
     for prior_questions in existing_exam_questions or []:
         for q in questions:
             if _is_duplicate(q, prior_questions):
@@ -403,18 +482,7 @@ async def generate_questions(
                     f'Repeated question (similar to an earlier exam): "{q["text"][:60]}".'
                 )
 
-    by_type: dict[str, list[dict]] = {t: [] for t in counts}
-    for q in questions:
-        by_type.setdefault(q["type"], []).append(q)
-
-    for t, needed in counts.items():
-        have = len(by_type.get(t, []))
-        if have < needed:
-            warnings.append(f"Only generated {have}/{needed} {t} question(s).")
-
-    final: list[dict] = []
-    for t in counts:
-        final.extend(by_type.get(t, [])[: counts[t]])
+    final = _slice_to_counts(questions, counts)
 
     mix_warning = _bloom_mix_warning(final)
     if mix_warning:
@@ -517,14 +585,12 @@ async def generate_questions_with_blueprint(
                     f"Only generated {have}/{needed_n} {t} question(s) from {page_label}."
                 )
 
-    by_type_all: dict[str, list[dict]] = {t: [] for t in counts}
-    for q in all_questions:
-        by_type_all.setdefault(q["type"], []).append(q)
-    final: list[dict] = []
-    for t, needed_n in counts.items():
-        final.extend(by_type_all.get(t, [])[:needed_n])
-
     warnings.append("Quality filter skipped to keep generation under the platform time limit.")
+
+    all_questions = await _fill_shortfall(
+        llm, chunks, counts, clos, all_questions, warnings, formats=formats
+    )
+    final = _slice_to_counts(all_questions, counts)
 
     for prior_questions in existing_exam_questions or []:
         for q in final:

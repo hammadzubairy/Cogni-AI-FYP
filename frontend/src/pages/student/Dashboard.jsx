@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import * as api from '../../api'
 import { useAuth } from '../../auth/AuthContext'
 import { ShellError, ShellLoading } from '../../components/AppShell'
@@ -25,6 +26,7 @@ function notesForClass(cls, data, examIdsByClass) {
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const [data, setData] = useState(null)
   const [matCounts, setMatCounts] = useState({})
   const [examIdsByClass, setExamIdsByClass] = useState({})
@@ -84,6 +86,26 @@ export default function Dashboard() {
       <div className="fd-head">
         <span className="small">{todayLong().toUpperCase()}</span>
         <h1>{greetingLine(user?.name).toUpperCase()}</h1>
+      </div>
+
+      <div className="sgrid" style={{ marginBottom: 22 }}>
+        <article
+          className="scard"
+          role="link"
+          tabIndex={0}
+          onClick={() => navigate('/app/student/study')}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault()
+              navigate('/app/student/study')
+            }
+          }}
+        >
+          <h3>Study</h3>
+          <div className="scard-n">AI</div>
+          <p className="small">Ask the study assistant about your materials and past feedback.</p>
+          <span className="btn small">Open study assistant</span>
+        </article>
       </div>
 
       <div className="sec-head">

@@ -484,6 +484,26 @@ h1,h2,h3,h4{letter-spacing:-.02em}
 
 
 
+/* Paper blueprint (CreateExam) */
+.blueprint-panel{display:flex;flex-direction:column;gap:18px;margin-bottom:16px}
+.blueprint-outline{margin:0;color:var(--color-muted-foreground)}
+.blueprint-section{display:flex;flex-direction:column;gap:2px}
+.blueprint-group{margin-bottom:10px;padding:12px 14px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-card);box-shadow:var(--shadow-sm)}
+.blueprint-group-lab{margin:0 0 6px;font-weight:600;color:var(--color-muted-foreground)}
+.slide-picker{display:flex;flex-direction:column;gap:8px}
+.slide-picker-empty{margin:4px 0;color:var(--color-muted-foreground)}
+.slide-chips{display:flex;flex-wrap:wrap;gap:6px}
+.slide-chip{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:4px 10px;border-radius:999px;border:1px solid color-mix(in srgb,var(--color-primary) 45%,var(--color-border));background:var(--color-primary-muted);color:var(--color-foreground);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer}
+.slide-chip:hover{border-color:var(--color-primary)}
+.slide-chip-lab{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:220px}
+.slide-picker-list{max-height:168px;overflow:auto;display:flex;flex-direction:column;gap:4px;padding:8px;border:1px solid var(--color-border);border-radius:var(--radius-sm);background:var(--color-muted)}
+.slide-opt{display:flex;align-items:flex-start;gap:10px;margin:0;padding:8px 10px;border-radius:10px;cursor:pointer;border:1px solid transparent;background:var(--color-card);color:var(--color-foreground)}
+.slide-opt:hover{border-color:var(--color-border)}
+.slide-opt.on{border-color:color-mix(in srgb,var(--color-primary) 55%,var(--color-border));background:var(--color-primary-muted)}
+.slide-opt input{margin-top:2px;accent-color:var(--color-primary)}
+.slide-opt-lab{flex:1;font-size:13.5px;line-height:1.35;min-width:0}
+.slide-opt-pg{margin-left:6px;opacity:.55;font-size:12px;font-weight:600}
+
 /* Appearance theme picker (Settings) */
 .theme-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
 .theme-card{display:flex;flex-direction:column;align-items:stretch;gap:10px;text-align:left;border:1px solid var(--color-border);background:var(--color-card);border-radius:var(--radius-sm);padding:12px;min-height:0;color:var(--color-foreground);font:inherit;cursor:pointer;transition:border-color var(--t-fast),box-shadow var(--t-fast),transform var(--t-fast)}

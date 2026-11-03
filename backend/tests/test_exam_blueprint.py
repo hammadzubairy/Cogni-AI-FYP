@@ -96,9 +96,42 @@ def test_allocation_pins_then_weightage():
     weight_scopes = [s for s in scopes if s.kind == "weight"]
     assert sum(s.counts.get("Long", 0) for s in pin_scopes) == 2
     assert sum(s.counts.get("Short", 0) for s in pin_scopes) == 6
+    # Totals across weight bands after pin deduction from overlapping (final) band.
     assert sum(s.counts.get("MCQ", 0) for s in weight_scopes) == 10
     assert sum(s.counts.get("Short", 0) for s in weight_scopes) == 9
     assert sum(s.counts.get("Long", 0) for s in weight_scopes) == 1
+    # Pins on page 7 hit the 70% band (pages 5–10); that band's Long leftover is 0.
+    final = next(s for s in weight_scopes if s.page_from == 5)
+    mid = next(s for s in weight_scopes if s.page_from == 1)
+    assert final.counts.get("Long", 0) == 0
+    assert mid.counts.get("Long", 0) == 1
+
+
+def test_pin_deducts_from_overlapping_band():
+    """5 Long, 30%/70% bands, pin 1 Long on slide 3 → mid remaining Long = band−1."""
+    counts = {"Long": 5}
+    weightage = [
+        {"material_id": "m1", "pages": [1, 2, 3, 4], "weight_pct": 30},
+        {"material_id": "m1", "pages": [5, 6, 7, 8, 9, 10], "weight_pct": 70},
+    ]
+    pins = [
+        {
+            "material_id": "m1",
+            "pages": [3],
+            "type_label": "Long",
+            "count": 1,
+        }
+    ]
+    scopes = plan_generation_scopes(counts, weightage=weightage, pins=pins)
+    pin_scopes = [s for s in scopes if s.kind == "pin"]
+    weight_scopes = [s for s in scopes if s.kind == "weight"]
+    assert sum(s.counts.get("Long", 0) for s in pin_scopes) == 1
+    # 30% of 5 → 2 mid, 70% → 3 final; pin takes 1 from mid → mid rem 1, final 3.
+    mid = next(s for s in weight_scopes if 3 in (s.pages or []) or s.page_from == 1)
+    final = next(s for s in weight_scopes if s.page_from == 5 or (s.pages and 10 in s.pages))
+    assert mid.counts.get("Long", 0) == 1
+    assert final.counts.get("Long", 0) == 3
+    assert sum(s.counts.get("Long", 0) for s in scopes) == 5
 
 
 def test_schema_rejects_bad_blueprint():

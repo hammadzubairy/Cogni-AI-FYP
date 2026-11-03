@@ -186,6 +186,11 @@ export function navBlueprint(role) {
   if (role === 'student') {
     return [
       {
+        id: 'study',
+        label: 'Study',
+        items: [{ page: 's-study', to: '/app/student/study', label: 'Study assistant' }],
+      },
+      {
         id: 'overview',
         label: 'Overview',
         items: [
@@ -203,12 +208,9 @@ export function navBlueprint(role) {
         classTabs: STUDENT_CLASS_TABS,
       },
       {
-        id: 'study',
-        label: 'Study',
-        items: [
-          { page: 's-study', to: '/app/student/study', label: 'Study assistant' },
-          { page: 's-settings', to: '/app/student/settings', label: 'Settings' },
-        ],
+        id: 'account',
+        label: 'Account',
+        items: [{ page: 's-settings', to: '/app/student/settings', label: 'Settings' }],
       },
     ]
   }

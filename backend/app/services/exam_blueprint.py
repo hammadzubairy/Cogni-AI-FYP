@@ -132,6 +132,24 @@ def _scope_pages(row: Any) -> tuple[int, int, list[int], list[int]]:
     return 1, 1, [], [int(i) for i in idxs]
 
 
+def _row_material_id(row: Any) -> str:
+    mid = row.material_id if hasattr(row, "material_id") else row["material_id"]
+    return str(mid)
+
+
+def _scopes_overlap(
+    pages_a: list[int],
+    idxs_a: list[int],
+    pages_b: list[int],
+    idxs_b: list[int],
+) -> bool:
+    if set(pages_a) & set(pages_b):
+        return True
+    if set(idxs_a) & set(idxs_b):
+        return True
+    return False
+
+
 @dataclass
 class GenScope:
     material_id: str
@@ -149,61 +167,129 @@ def plan_generation_scopes(
     weightage: list[Any] | None,
     pins: list[Any] | None,
 ) -> list[GenScope]:
-    """Reserve pin counts, split the remainder across weightage ranges by %."""
-    remaining = {k: int(v) for k, v in global_counts.items() if int(v) > 0}
+    """Pin-aware band allocation: split by weight %, deduct pins from overlapping bands."""
+    totals = {k: int(v) for k, v in global_counts.items() if int(v) > 0}
     scopes: list[GenScope] = []
+    weight_rows = list(weightage or [])
+    pin_rows = list(pins or [])
 
-    for pin in pins or []:
+    # ---- Pins only (no weightage): reserve pins; caller fills remainder ----
+    if not weight_rows:
+        remaining = dict(totals)
+        for pin in pin_rows:
+            label = pin.type_label if hasattr(pin, "type_label") else pin["type_label"]
+            count = int(pin.count if hasattr(pin, "count") else pin["count"])
+            mid = _row_material_id(pin)
+            pf, pt, pages, idxs = _scope_pages(pin)
+            have = remaining.get(label, 0)
+            take = min(count, have)
+            if take <= 0:
+                continue
+            remaining[label] = have - take
+            scopes.append(
+                GenScope(
+                    material_id=mid,
+                    page_from=pf,
+                    page_to=pt,
+                    counts={label: take},
+                    kind="pin",
+                    pages=pages,
+                    chunk_idxs=idxs,
+                )
+            )
+        return scopes
+
+    # ---- Weight bands: split each type by % ----
+    weights = [
+        float(r.weight_pct if hasattr(r, "weight_pct") else r["weight_pct"]) for r in weight_rows
+    ]
+    band_meta: list[tuple[str, int, int, list[int], list[int]]] = []
+    for row in weight_rows:
+        mid = _row_material_id(row)
+        pf, pt, pages, idxs = _scope_pages(row)
+        band_meta.append((mid, pf, pt, pages, idxs))
+
+    band_quotas: list[dict[str, int]] = [{} for _ in weight_rows]
+    for label, need in totals.items():
+        parts = _largest_remainder_split(need, weights)
+        for i, n in enumerate(parts):
+            if n > 0:
+                band_quotas[i][label] = n
+
+    # ---- Deduct pins from overlapping band quotas, emit pin scopes ----
+    for pin in pin_rows:
         label = pin.type_label if hasattr(pin, "type_label") else pin["type_label"]
         count = int(pin.count if hasattr(pin, "count") else pin["count"])
-        mid = pin.material_id if hasattr(pin, "material_id") else pin["material_id"]
-        pf, pt, pages, idxs = _scope_pages(pin)
-        have = remaining.get(label, 0)
-        take = min(count, have)
-        if take <= 0:
+        if count <= 0 or label not in totals:
             continue
-        remaining[label] = have - take
+        mid = _row_material_id(pin)
+        pf, pt, pages, idxs = _scope_pages(pin)
+
+        # Prefer bands that overlap this pin (same material).
+        overlap_idxs = [
+            i
+            for i, (bmid, _, _, bpages, bidxs) in enumerate(band_meta)
+            if bmid == mid and _scopes_overlap(pages, idxs, bpages, bidxs)
+        ]
+        # Fall back: same material bands, then any band with remaining quota.
+        same_mid = [i for i, (bmid, *_) in enumerate(band_meta) if bmid == mid]
+        order = overlap_idxs or same_mid or list(range(len(band_meta)))
+
+        taken = 0
+        need = count
+        for i in order:
+            if need <= 0:
+                break
+            have = band_quotas[i].get(label, 0)
+            if have <= 0:
+                continue
+            take = min(need, have)
+            band_quotas[i][label] = have - take
+            if band_quotas[i][label] <= 0:
+                band_quotas[i].pop(label, None)
+            taken += take
+            need -= take
+
+        # Steal from any remaining band if pin exceeds preferred band quota.
+        if need > 0:
+            for i in range(len(band_meta)):
+                if need <= 0:
+                    break
+                if i in order:
+                    continue
+                have = band_quotas[i].get(label, 0)
+                if have <= 0:
+                    continue
+                take = min(need, have)
+                band_quotas[i][label] = have - take
+                if band_quotas[i][label] <= 0:
+                    band_quotas[i].pop(label, None)
+                taken += take
+                need -= take
+
+        if taken <= 0:
+            continue
         scopes.append(
             GenScope(
-                material_id=str(mid),
+                material_id=mid,
                 page_from=pf,
                 page_to=pt,
-                counts={label: take},
+                counts={label: taken},
                 kind="pin",
                 pages=pages,
                 chunk_idxs=idxs,
             )
         )
 
-    weight_rows = list(weightage or [])
-    rem_total = sum(remaining.values())
-    if rem_total <= 0:
-        return scopes
-
-    if not weight_rows:
-        return scopes
-
-    weights = [
-        float(r.weight_pct if hasattr(r, "weight_pct") else r["weight_pct"]) for r in weight_rows
-    ]
-    per_row: list[dict[str, int]] = [{} for _ in weight_rows]
-    for label, need in remaining.items():
-        if need <= 0:
-            continue
-        parts = _largest_remainder_split(need, weights)
-        for i, n in enumerate(parts):
-            if n > 0:
-                per_row[i][label] = n
-
+    # ---- Emit remaining weight-band scopes ----
     for i, row in enumerate(weight_rows):
-        counts = {k: v for k, v in per_row[i].items() if v > 0}
+        counts = {k: v for k, v in band_quotas[i].items() if v > 0}
         if not counts:
             continue
-        mid = row.material_id if hasattr(row, "material_id") else row["material_id"]
-        pf, pt, pages, idxs = _scope_pages(row)
+        mid, pf, pt, pages, idxs = band_meta[i]
         scopes.append(
             GenScope(
-                material_id=str(mid),
+                material_id=mid,
                 page_from=pf,
                 page_to=pt,
                 counts=counts,
@@ -225,3 +311,21 @@ def remaining_counts_after_pins(
         if label in remaining:
             remaining[label] = max(0, remaining[label] - count)
     return {k: v for k, v in remaining.items() if v > 0}
+
+
+def shortfall_counts(
+    requested: dict[str, int], questions: list[dict]
+) -> dict[str, int]:
+    """Return missing counts per type after generation."""
+    have: dict[str, int] = {}
+    for q in questions:
+        t = q.get("type")
+        if t:
+            have[t] = have.get(t, 0) + 1
+    out: dict[str, int] = {}
+    for label, need in requested.items():
+        n = int(need)
+        got = have.get(label, 0)
+        if got < n:
+            out[label] = n - got
+    return out
