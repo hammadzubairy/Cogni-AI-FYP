@@ -16,29 +16,6 @@ export function getHealth() {
   return get('/health', { skipAuth: true })
 }
 
-/* ---------- OCR Studio ---------- */
-export function ocrHealth() {
-  return get('/ocr/health', { skipAuth: true })
-}
-
-export function ocrFile(file, options = {}) {
-  const fd = new FormData()
-  fd.append('file', file)
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), options.timeoutMs || 180_000)
-  return upload('/ocr/file', fd, { signal: ctrl.signal, ...options }).finally(() =>
-    clearTimeout(timer),
-  )
-}
-
-export function ocrUrl(url, options = {}) {
-  const ctrl = new AbortController()
-  const timer = setTimeout(() => ctrl.abort(), options.timeoutMs || 120_000)
-  return post('/ocr/url', { url }, { signal: ctrl.signal, ...options }).finally(() =>
-    clearTimeout(timer),
-  )
-}
-
 /* ---------- auth ---------- */
 export function login(email, password, role) {
   return post('/auth/login', { email, password, role }, { skipAuth: true })

@@ -72,7 +72,6 @@ export default function App() {
                       </RoleRoute>
                     }
                   />
-
                   <Route path="/app" element={<Navigate to="/login" replace />} />
                   <Route path="*" element={<NotFound />} />
                 </Routes>

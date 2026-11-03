@@ -105,7 +105,6 @@ export function navBlueprint(role) {
         items: [
           { page: 'a-settings', to: '/app/admin/settings', label: 'Settings' },
           { page: 'a-audit', to: '/app/admin/settings?tab=activity', label: 'Activity log' },
-          { page: 'x-ocr', to: '/ocr', label: 'OCR Studio' },
         ],
       },
     ]
@@ -141,10 +140,7 @@ export function navBlueprint(role) {
       {
         id: 'account',
         label: 'Account',
-        items: [
-          { page: 'h-settings', to: '/app/hod/settings', label: 'Settings' },
-          { page: 'x-ocr', to: '/ocr', label: 'OCR Studio' },
-        ],
+        items: [{ page: 'h-settings', to: '/app/hod/settings', label: 'Settings' }],
       },
     ]
   }
@@ -183,10 +179,7 @@ export function navBlueprint(role) {
       {
         id: 'account',
         label: 'Account',
-        items: [
-          { page: 't-settings', to: '/app/teacher/settings', label: 'Settings' },
-          { page: 'x-ocr', to: '/ocr', label: 'OCR Studio' },
-        ],
+        items: [{ page: 't-settings', to: '/app/teacher/settings', label: 'Settings' }],
       },
     ]
   }
@@ -215,7 +208,6 @@ export function navBlueprint(role) {
         items: [
           { page: 's-study', to: '/app/student/study', label: 'Study assistant' },
           { page: 's-settings', to: '/app/student/settings', label: 'Settings' },
-          { page: 'x-ocr', to: '/ocr', label: 'OCR Studio' },
         ],
       },
     ]
@@ -337,7 +329,6 @@ export function pageToPath(page, id) {
     's-feedback': id ? `/app/student/attempts/${id}/feedback` : '/app/student/results',
     's-study': '/app/student/study',
     's-settings': '/app/student/settings',
-    'x-ocr': '/ocr',
   }
   return map[page] || null
 }
@@ -393,7 +384,6 @@ export function pathToPage(pathname, search = '') {
     [/^\/app\/student\/classes\/[^/]+$/, 's-class'],
     [/^\/app\/student\/classes$/, 's-classes'],
     [/^\/app\/student$/, 's-dash'],
-    [/^\/ocr$/, 'x-ocr'],
   ]
   for (const [re, page] of rules) {
     if (re.test(p)) return page
@@ -434,7 +424,6 @@ export function activeNavPage(pathname, search = '') {
     's-class',
     's-study',
     's-settings',
-    'x-ocr',
   ])
   if (exactLeaves.has(page)) return page
   return PARENT[page] || page
