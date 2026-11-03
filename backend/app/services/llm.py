@@ -190,12 +190,10 @@ class OpenAIClient(LLMClient):
                 result = await self._json_complete_for_model(
                     system, user, max_tokens=max_tokens, temperature=temperature, model=model_id
                 )
-            except LLMJSONError:
-                # Let call_json() retry once with the full chain, as before.
-                raise
-            except LLMRequestError as exc:
+            except (LLMJSONError, LLMRequestError) as exc:
                 last_error = exc
-                if not _is_transient_provider_error(exc):
+                # Auth/size errors are not fixed by switching models.
+                if isinstance(exc, LLMRequestError) and not _is_transient_provider_error(exc):
                     raise
                 if model_id != models_to_try[-1]:
                     log_event(
@@ -206,6 +204,11 @@ class OpenAIClient(LLMClient):
                         error=str(exc)[:300],
                     )
                     continue
+                if isinstance(exc, LLMJSONError):
+                    raise LLMJSONError(
+                        "This model could not generate the paper. "
+                        "Please retry with another model, or try again."
+                    ) from exc
                 raise LLMRequestError(
                     "The AI service is busy on all available free models. "
                     "Try again later, or switch to another model in Settings."
@@ -501,8 +504,8 @@ class MockLLM(LLMClient):
             base.update(
                 {
                     "text": (
-                        f'Item {variant} on {heading}: the source begins "{snippet}". '
-                        f"Which statement is correct?"
+                        f"MCQ #{variant} ({heading}): which statement about "
+                        f"this topic is correct? [ref {chunk.get('idx', 0)}-{variant}]"
                     ),
                     "options": options,
                     "answer_index": correct_index,
@@ -515,13 +518,13 @@ class MockLLM(LLMClient):
             shortish = "short" in low or qtype in ("Short", "Short Questions")
             if shortish:
                 prompt = (
-                    f'Item {variant} on {heading}: the source begins "{snippet}". '
-                    f"In your own words, explain the key idea."
+                    f"Short #{variant} on {heading}: briefly explain the key idea "
+                    f"for case {variant} (chunk {chunk.get('idx', 0)})."
                 )
             else:
                 prompt = (
-                    f'Item {variant} on {heading}: the source begins "{snippet}". '
-                    f"Critically evaluate and justify your position on this idea."
+                    f"Long #{variant} on {heading}: critically evaluate this idea "
+                    f"for case {variant} (chunk {chunk.get('idx', 0)})."
                 )
             base.update(
                 {

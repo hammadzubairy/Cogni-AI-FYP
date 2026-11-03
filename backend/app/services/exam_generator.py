@@ -373,12 +373,21 @@ async def _fill_shortfall(
                 )
                 warnings.extend(warns)
                 added = 0
+                # Exact-text dedupe only on fill (fuzzy Jaccard blocked mock/similar
+                # paraphrases and left papers short of the requested counts).
+                seen = {
+                    str(q.get("text") or "").strip().lower()
+                    for q in out
+                    if q.get("text")
+                }
                 for q in batch:
                     if q.get("type") != label:
                         continue
-                    if _is_duplicate(q, out):
+                    text = str(q.get("text") or "").strip().lower()
+                    if not text or text in seen:
                         continue
                     out.append(q)
+                    seen.add(text)
                     added += 1
                     if added >= need:
                         break
