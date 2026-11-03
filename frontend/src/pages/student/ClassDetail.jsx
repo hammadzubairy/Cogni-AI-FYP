@@ -97,13 +97,6 @@ function StudentMaterials({ materials }) {
   )
 }
 
-const TABS = [
-  ['overview', 'Overview'],
-  ['exams', 'Exams'],
-  ['results', 'Results'],
-  ['material', 'Material'],
-]
-
 export default function ClassDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -310,19 +303,6 @@ export default function ClassDetail() {
           <h1>{cls.name}</h1>
         </div>
       </header>
-      <nav className="ctabs tabs" aria-label="Class sections">
-        {TABS.map(([k, l]) => (
-          <button
-            key={k}
-            type="button"
-            className={tab === k ? 'on' : ''}
-            aria-current={tab === k ? 'page' : undefined}
-            onClick={() => setTab(k)}
-          >
-            {l}
-          </button>
-        ))}
-      </nav>
       {body}
     </>
   )

@@ -9,8 +9,6 @@ import { Icon } from '../../components/IconSprite'
 import { useModal } from '../../components/Modal'
 import PageTop from '../../components/PageTop'
 import { useToast } from '../../components/Toast'
-import DeptTabs from './DeptTabs'
-
 /**
  * Admin departments + classes tabs (v7 `P['a-depts']` / `P['a-classes']`).
  */
@@ -138,7 +136,7 @@ export default function Departments() {
   return (
     <>
       <PageTop
-        title="Departments"
+        title={tab === 'classes' ? 'Classes' : 'Departments'}
         actions={
           tab === 'depts' ? (
             <button type="button" className="btn primary" onClick={openAddDept}>
@@ -148,7 +146,6 @@ export default function Departments() {
           ) : null
         }
       />
-      <DeptTabs current={tab === 'classes' ? 'classes' : 'depts'} />
 
       {tab === 'classes' ? (
         <div className="panel">

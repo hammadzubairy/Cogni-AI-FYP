@@ -9,8 +9,6 @@ import { Icon } from '../../components/IconSprite'
 import PageTop from '../../components/PageTop'
 import { useToast } from '../../components/Toast'
 import { formatRelativeTime } from '../../utils/format'
-import SettingsTabs from './SettingsTabs'
-
 /**
  * Admin settings + activity log (v7 `P['a-settings']` / `P['a-audit']`).
  */
@@ -104,7 +102,7 @@ export default function Settings() {
   return (
     <>
       <PageTop
-        title="Settings"
+        title={tab === 'activity' ? 'Activity log' : 'Settings'}
         actions={
           tab === 'general' ? (
             <button
@@ -119,7 +117,6 @@ export default function Settings() {
           ) : null
         }
       />
-      <SettingsTabs current={tab === 'activity' ? 'activity' : 'general'} />
 
       {tab === 'activity' ? (
         <>

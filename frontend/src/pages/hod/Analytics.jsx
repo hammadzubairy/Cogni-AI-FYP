@@ -10,8 +10,6 @@ import Panel from '../../components/Panel'
 import Pill from '../../components/Pill'
 import ScoreBar from '../../components/ScoreBar'
 import Stat from '../../components/Stat'
-import DeptTabs from './DeptTabs'
-
 /**
  * Department analytics (v7 `P['h-analytics']`). Plain CSS bars via ScoreBar.
  */
@@ -82,7 +80,6 @@ export default function Analytics() {
   return (
     <>
       <PageTop crumb={deptName || 'Department'} title="Department" />
-      <DeptTabs current="analytics" />
 
       <div className="grid g4">
         <Stat label="Classes" value={byClass.length} />

@@ -10,8 +10,6 @@ import PageTop from '../../components/PageTop'
 import Panel from '../../components/Panel'
 import { useToast } from '../../components/Toast'
 import { APPROVAL_LABELS } from '../../utils/hod'
-import DeptTabs from './DeptTabs'
-
 /**
  * Department policy (v7 `P['h-policy']` + ACT pol-save).
  */
@@ -95,14 +93,13 @@ export default function Policy() {
     <>
       <PageTop
         crumb="Applied automatically to every paper sent for approval"
-        title="Department"
+        title="Policy"
         actions={
           <button type="button" className="btn primary" onClick={onSave} disabled={saving}>
             Save policy
           </button>
         }
       />
-      <DeptTabs current="policy" />
 
       <div className="grid g2e">
         <Panel title="Coverage rules">

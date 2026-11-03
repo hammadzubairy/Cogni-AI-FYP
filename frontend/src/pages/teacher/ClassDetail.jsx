@@ -14,14 +14,6 @@ import { classHue, copyText } from '../../utils/teacher'
 import Exams from './Exams'
 import Materials from './Materials'
 
-const TABS = [
-  ['overview', 'Overview'],
-  ['exams', 'Exams'],
-  ['material', 'Material'],
-  ['students', 'Students'],
-  ['insights', 'Insights'],
-]
-
 export default function ClassDetail() {
   const { id } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -408,19 +400,6 @@ export default function ClassDetail() {
           </button>
         </div>
       </header>
-      <nav className="ctabs tabs" aria-label="Class sections">
-        {TABS.map(([k, l]) => (
-          <button
-            key={k}
-            type="button"
-            className={tab === k ? 'on' : ''}
-            aria-current={tab === k ? 'page' : undefined}
-            onClick={() => setTab(k)}
-          >
-            {l}
-          </button>
-        ))}
-      </nav>
       {body}
     </>
   )

@@ -30,10 +30,11 @@ test.describe('HOD portal', () => {
 
   test('analytics and policy', async ({ page }) => {
     await page.goto('/app/hod/analytics')
-    await expect(page.getByRole('button', { name: 'Analytics' })).toBeVisible()
-    await expect(page.getByRole('button', { name: 'Policy' })).toBeVisible()
-
-    await page.getByRole('navigation', { name: 'Section' }).getByRole('button', { name: 'Policy' }).click()
+    await expect(page.getByRole('heading', { name: 'Department' })).toBeVisible()
+    await page
+      .getByRole('navigation', { name: /Head of Department/i })
+      .getByRole('button', { name: 'Policy', exact: true })
+      .click()
     await expect(page).toHaveURL(/\/app\/hod\/policy/)
     await expect(page.getByRole('button', { name: 'Save policy' })).toBeVisible()
   })

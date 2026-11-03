@@ -73,7 +73,10 @@ test.describe('App tour with screenshots', () => {
     await expect(page.getByRole('heading', { name: 'Departments' })).toBeVisible()
     await snap(page, 'admin-departments', 'Admin departments')
 
-    await page.getByRole('navigation', { name: 'Section' }).getByRole('button', { name: 'Classes' }).click()
+    await page
+      .getByRole('navigation', { name: /Admin/i })
+      .getByRole('button', { name: 'Classes', exact: true })
+      .click()
     await expect(page).toHaveURL(/tab=classes/)
     await snap(page, 'admin-classes', 'Admin departments → Classes tab')
 
@@ -89,7 +92,10 @@ test.describe('App tour with screenshots', () => {
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible()
     await snap(page, 'admin-settings', 'Admin settings (self-signup toggle)')
 
-    await page.getByRole('navigation', { name: 'Section' }).getByRole('button', { name: 'Activity log' }).click()
+    await page
+      .getByRole('navigation', { name: /Admin/i })
+      .getByRole('button', { name: 'Activity log', exact: true })
+      .click()
     await expect(page).toHaveURL(/tab=activity/)
     await snap(page, 'admin-activity', 'Admin activity log')
   })

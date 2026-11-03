@@ -20,7 +20,8 @@ test.describe('Admin portal', () => {
   test('users page: tabs, search, actions', async ({ page }) => {
     await page.goto('/app/admin/users')
     await expect(page.getByRole('heading', { name: 'Users' })).toBeVisible()
-    await expect(page.getByRole('button', { name: /Add user/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Add staff$/i })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Add user$/i })).toHaveCount(0)
     await expect(page.getByRole('button', { name: /Teachers and heads/i })).toBeVisible()
     await page.getByRole('button', { name: /Students/i }).click()
     await page.locator('#uq').fill('hamza')
@@ -33,7 +34,10 @@ test.describe('Admin portal', () => {
     await expect(page.getByRole('button', { name: /Add department/i })).toBeVisible()
     await expect(page.getByText(/Computer Science/i).first()).toBeVisible()
 
-    await page.getByRole('navigation', { name: 'Section' }).getByRole('button', { name: 'Classes' }).click()
+    await page
+      .getByRole('navigation', { name: /Admin/i })
+      .getByRole('button', { name: 'Classes', exact: true })
+      .click()
     await expect(page).toHaveURL(/tab=classes/)
     await expect(page.getByRole('columnheader', { name: 'Class' })).toBeVisible()
     await expect(page.getByText(/CS-201-A/i).first()).toBeVisible()
@@ -46,7 +50,10 @@ test.describe('Admin portal', () => {
     await page.getByRole('button', { name: 'Save settings' }).click()
     await expect(page.getByText(/Settings saved/i)).toBeVisible({ timeout: 15_000 })
 
-    await page.getByRole('navigation', { name: 'Section' }).getByRole('button', { name: 'Activity log' }).click()
+    await page
+      .getByRole('navigation', { name: /Admin/i })
+      .getByRole('button', { name: 'Activity log', exact: true })
+      .click()
     await expect(page).toHaveURL(/tab=activity/)
     await expect(page.getByRole('columnheader', { name: 'What happened' })).toBeVisible()
     await expect(page.locator('table tbody tr').first()).toBeVisible()

@@ -1,11 +1,17 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import * as api from '../api'
 import { ROLE_HOME, useAuth } from '../auth/AuthContext'
 import useCounts from '../hooks/useCounts'
 import useNotifications from '../hooks/useNotifications'
 import { formatShortDate, initials } from '../utils/format'
-import { ROLE, activeNavPage, notificationPath } from '../utils/roleNav'
+import {
+  ROLE,
+  activeNavPage,
+  buildNavSections,
+  flatNavItems,
+  notificationPath,
+} from '../utils/roleNav'
 import Logo from './Logo'
 import ThemeButton from './ThemeButton'
 import { Icon } from './IconSprite'
@@ -59,7 +65,8 @@ export default function AppShell({ children }) {
   const toast = useToast()
 
   const role = user?.role
-  const R = ROLE[role] || ROLE.admin
+  const navRole = ROLE[role] ? role : 'admin'
+  const R = ROLE[navRole]
   const { counts, refresh: refreshCounts } = useCounts(role)
   const notes = useNotifications(!!user)
   const otherPortals = (user?.roles || []).filter((r) => r && r !== role)
@@ -69,12 +76,23 @@ export default function AppShell({ children }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const [llmStatus, setLlmStatus] = useState(null)
   const [switching, setSwitching] = useState(false)
+  const [navClasses, setNavClasses] = useState([])
 
   const bellWrap = useRef(null)
   const menuWrap = useRef(null)
 
   const active = activeNavPage(location.pathname, location.search) || R.homePage
   const unread = notes.unreadCount
+  const navItems = useMemo(() => flatNavItems(navRole), [navRole])
+  const sections = useMemo(
+    () =>
+      buildNavSections(navRole, {
+        classes: navClasses,
+        pathname: location.pathname,
+        search: location.search,
+      }),
+    [navRole, navClasses, location.pathname, location.search],
+  )
 
   const footPlace = user?.dept_name || user?.institution_name || 'Institution'
   const footTerm = user?.current_term || ''
@@ -134,9 +152,28 @@ export default function AppShell({ children }) {
   }, [role])
 
   useEffect(() => {
-    const cur = R.nav.find((n) => n.page === active)
+    if (role !== 'teacher' && role !== 'student') {
+      setNavClasses([])
+      return undefined
+    }
+    let cancelled = false
+    api
+      .listClasses()
+      .then((list) => {
+        if (!cancelled) setNavClasses(Array.isArray(list) ? list : [])
+      })
+      .catch(() => {
+        if (!cancelled) setNavClasses([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [role, location.pathname])
+
+  useEffect(() => {
+    const cur = navItems.find((n) => n.page === active)
     document.title = `${cur ? `${cur.label} · ` : ''}Cogni.ai`
-  }, [active, R.nav])
+  }, [active, navItems])
 
   // Opening the panel counts as seen — clear unread badge immediately.
   useEffect(() => {
@@ -209,27 +246,63 @@ export default function AppShell({ children }) {
           </div>
           <div className={`portal r-${role}`}>{R.label}</div>
           <nav aria-label={`${R.name} navigation`}>
-            {R.nav.map((item) => {
-              const on = item.page === active
-              const c = badgeFor(item.badge)
-              return (
-                <button
-                  key={item.page}
-                  type="button"
-                  className={on ? 'on' : ''}
-                  aria-current={on ? 'page' : undefined}
-                  onClick={() => onNav(item.to)}
-                >
-                  <span className="lab">{item.label}</span>
-                  {c ? (
-                    <span className="cnt">
-                      {c}
-                      <span className="sr-only"> need attention</span>
-                    </span>
-                  ) : null}
-                </button>
-              )
-            })}
+            {sections.map((section) => (
+              <div key={section.id} className="nav-group">
+                <div className="nav-h">{section.label}</div>
+                <div className="nav-items">
+                  {section.items.map((item) => {
+                    const on = item.page === active
+                    const c = badgeFor(item.badge)
+                    return (
+                      <button
+                        key={item.page}
+                        type="button"
+                        className={on ? 'on' : ''}
+                        aria-current={on ? 'page' : undefined}
+                        onClick={() => onNav(item.to)}
+                      >
+                        <span className="lab">{item.label}</span>
+                        {c ? (
+                          <span className="cnt">
+                            {c}
+                            <span className="sr-only"> need attention</span>
+                          </span>
+                        ) : null}
+                      </button>
+                    )
+                  })}
+                  {section.children?.map((child) => (
+                    <div key={child.key} className="nav-class">
+                      <button
+                        type="button"
+                        className={child.on ? 'on' : ''}
+                        aria-current={child.on && !child.tabs?.length ? 'page' : undefined}
+                        aria-expanded={child.on || undefined}
+                        onClick={() => onNav(child.to)}
+                        title={child.label}
+                      >
+                        <span className="lab">{child.label}</span>
+                      </button>
+                      {child.tabs?.length ? (
+                        <div className="nav-sub">
+                          {child.tabs.map((tab) => (
+                            <button
+                              key={tab.key}
+                              type="button"
+                              className={tab.on ? 'on' : ''}
+                              aria-current={tab.on ? 'page' : undefined}
+                              onClick={() => onNav(tab.to)}
+                            >
+                              <span className="lab">{tab.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
           </nav>
           <div className="foot">
             {footPlace}
